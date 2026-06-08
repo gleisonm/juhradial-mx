@@ -870,6 +870,38 @@ class RadialMenuPaintingMixin:
             text_rect = QRectF(cx - s * 0.5, cy - s * 0.5, s, s)
             p.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "?")
 
+        elif icon_type == "terminal":
+            # Terminal window with a ">" prompt and a cursor underscore
+            w, h = size * 0.82, size * 0.64
+            p.setPen(QPen(color, 2))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(QRectF(cx - w / 2, cy - h / 2, w, h), 3, 3)
+            # prompt chevron ">"
+            chevron_x = cx - w * 0.22
+            p.drawLine(
+                QPointF(chevron_x - w * 0.08, cy - h * 0.16),
+                QPointF(chevron_x + w * 0.04, cy),
+            )
+            p.drawLine(
+                QPointF(chevron_x + w * 0.04, cy),
+                QPointF(chevron_x - w * 0.08, cy + h * 0.16),
+            )
+            # cursor underscore
+            p.drawLine(
+                QPointF(cx + w * 0.02, cy + h * 0.12),
+                QPointF(cx + w * 0.22, cy + h * 0.12),
+            )
+
+        else:
+            # Generic fallback so an unmapped icon is never invisible
+            p.setPen(QPen(color, 2))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(
+                QRectF(cx - size * 0.32, cy - size * 0.32, size * 0.64, size * 0.64),
+                4, 4,
+            )
+            p.drawEllipse(QPointF(cx, cy), size * 0.07, size * 0.07)
+
     @staticmethod
     def _ease_out_back(t, overshoot=1.4):
         """OutBack easing - slight overshoot then settle, creates 'droplet' feel."""

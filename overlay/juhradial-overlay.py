@@ -640,6 +640,7 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
             self._kde_base_x = x - half
             self._kde_base_y = y - half
             self._kde_frame = 0
+            self._kde_recomposite = overlay_actions.load_kde_recomposite_workaround()
             self._update_kde_mask()
 
         self.show()
@@ -752,7 +753,7 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
         if dirty:
             self.update()
         elif self._anim_timer.isActive():
-            if IS_KDE:
+            if IS_KDE and getattr(self, "_kde_recomposite", True):
                 # Keep timer alive on KDE for position oscillation below
                 self.update()
             else:
@@ -762,7 +763,13 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
         # On KDE Plasma, micro-oscillate window position by 1px each frame.
         # This forces KWin to re-composite the wallpaper behind the window,
         # preventing the frozen/cached rectangle on animated shader wallpapers.
-        if IS_KDE and hasattr(self, '_kde_base_x'):
+        # Opt-out via radial.kde_recomposite_workaround for users who see the
+        # 1px tremble and don't use an animated wallpaper.
+        if (
+            IS_KDE
+            and getattr(self, "_kde_recomposite", True)
+            and hasattr(self, "_kde_base_x")
+        ):
             self._kde_frame += 1
             offset = self._kde_frame % 2
             self.move(self._kde_base_x + offset, self._kde_base_y)
@@ -938,6 +945,8 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
                 )
             elif cmd_type == "settings":
                 overlay_actions.open_settings()
+            elif cmd_type == "ai_prompt":
+                overlay_actions.open_ai_prompt_builder(engine=cmd or None)
             elif cmd_type == "submenu":
                 self.submenu_active = True
                 self.submenu_slice = self.highlighted_slice
@@ -974,6 +983,8 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+            elif cmd_type == "ai_prompt":
+                overlay_actions.open_ai_prompt_builder(engine=cmd or None)
             elif cmd_type == "easy_switch":
                 try:
                     host_index = int(cmd)
