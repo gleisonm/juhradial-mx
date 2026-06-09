@@ -162,8 +162,18 @@ class CloseButtonHaptic:
         print("[CloseHaptic] disabled")
 
     def _refresh_loop(self):
+        last_logged = "init"
         while self._running:
-            self._rect = _active_close_rect()
+            rect = _active_close_rect()
+            self._rect = rect
+            # Log only when the detection state changes, to aid testing.
+            state = "none" if rect is None else str(rect)
+            if state != last_logged:
+                last_logged = state
+                if rect is None:
+                    print("[CloseHaptic] active window has no server-side titlebar (CSD?) — no X rect")
+                else:
+                    print(f"[CloseHaptic] tracking X button at {rect}")
             time.sleep(_WINDOW_REFRESH_MS / 1000.0)
 
     def _check_cursor(self):
@@ -178,6 +188,7 @@ class CloseButtonHaptic:
             now = time.monotonic()
             if now - self._last_pulse >= _MIN_PULSE_GAP_S:
                 self._last_pulse = now
+                print("[CloseHaptic] cursor entered X button -> pulse")
                 try:
                     self._trigger(self._event)
                 except Exception as e:  # never let haptics break the overlay
