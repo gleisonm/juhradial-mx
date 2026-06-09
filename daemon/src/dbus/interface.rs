@@ -97,6 +97,7 @@ impl JuhRadialService {
             "slice_change" => HapticEvent::SliceChange,
             "confirm" => HapticEvent::SelectionConfirm,
             "invalid" => HapticEvent::InvalidAction,
+            "notification" => HapticEvent::Notification,
             _ => {
                 tracing::warn!(event, "Unknown haptic event type");
                 return Ok(());

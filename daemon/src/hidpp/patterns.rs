@@ -212,6 +212,8 @@ pub enum HapticEvent {
     SelectionConfirm,
     /// User selects an empty or invalid slice
     InvalidAction,
+    /// A desktop notification arrived
+    Notification,
 }
 
 impl HapticEvent {
@@ -222,6 +224,7 @@ impl HapticEvent {
             HapticEvent::SliceChange => haptic_profiles::SLICE_CHANGE,
             HapticEvent::SelectionConfirm => haptic_profiles::CONFIRM,
             HapticEvent::InvalidAction => haptic_profiles::INVALID,
+            HapticEvent::Notification => haptic_profiles::CONFIRM,
         }
     }
 
@@ -232,6 +235,7 @@ impl HapticEvent {
             HapticEvent::SliceChange => HapticPattern::Single,
             HapticEvent::SelectionConfirm => HapticPattern::Double,
             HapticEvent::InvalidAction => HapticPattern::Triple,
+            HapticEvent::Notification => HapticPattern::Double,
         }
     }
 
@@ -260,6 +264,8 @@ impl HapticEvent {
             HapticEvent::SelectionConfirm => Mx4HapticPattern::Completed,
             // Invalid action: error/warning feel
             HapticEvent::InvalidAction => Mx4HapticPattern::AngryAlert,
+            // Notification: positive alert feel (overridable via per-event config)
+            HapticEvent::Notification => Mx4HapticPattern::HappyAlert,
         }
     }
 }
@@ -271,6 +277,7 @@ impl fmt::Display for HapticEvent {
             HapticEvent::SliceChange => write!(f, "slice_change"),
             HapticEvent::SelectionConfirm => write!(f, "selection_confirm"),
             HapticEvent::InvalidAction => write!(f, "invalid_action"),
+            HapticEvent::Notification => write!(f, "notification"),
         }
     }
 }
@@ -286,6 +293,8 @@ pub struct PerEventPattern {
     pub confirm: Mx4HapticPattern,
     /// Pattern for invalid action
     pub invalid: Mx4HapticPattern,
+    /// Pattern for desktop notifications
+    pub notification: Mx4HapticPattern,
 }
 
 impl Default for PerEventPattern {
@@ -295,6 +304,7 @@ impl Default for PerEventPattern {
             slice_change: Mx4HapticPattern::SubtleCollision,
             confirm: Mx4HapticPattern::SharpStateChange,
             invalid: Mx4HapticPattern::AngryAlert,
+            notification: Mx4HapticPattern::HappyAlert,
         }
     }
 }
@@ -307,6 +317,7 @@ impl PerEventPattern {
             HapticEvent::SliceChange => self.slice_change,
             HapticEvent::SelectionConfirm => self.confirm,
             HapticEvent::InvalidAction => self.invalid,
+            HapticEvent::Notification => self.notification,
         }
     }
 }

@@ -459,6 +459,29 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
             f"[DBUS] D-Bus interface created - isValid: {self.daemon_iface.isValid()}"
         )
 
+        # Experimental: haptic pulse when the cursor enters a window's X button
+        try:
+            import close_button_haptic
+
+            self.close_haptic = close_button_haptic.CloseButtonHaptic(self._trigger_haptic)
+            if close_button_haptic.load_enabled():
+                self.close_haptic.start()
+        except Exception as e:
+            print(f"[CloseHaptic] init failed: {e}")
+            self.close_haptic = None
+
+        # Haptic pulse when a desktop notification arrives. The watcher runs as a
+        # passive bus monitor and gates each pulse on the live config flag, so the
+        # Settings switch and the tray toggle both take effect without a restart.
+        try:
+            import notification_haptic
+
+            self.notif_haptic = notification_haptic.NotificationHaptic()
+            self.notif_haptic.start()
+        except Exception as e:
+            print(f"[NotifHaptic] init failed: {e}")
+            self.notif_haptic = None
+
         # Fade animation
         self.anim = QPropertyAnimation(self, b"windowOpacity")
         self.anim.setDuration(180)
@@ -1259,6 +1282,39 @@ def create_tray_icon(app, radial_menu):
 
     settings_action = menu.addAction(_("Settings"))
     settings_action.triggered.connect(overlay_actions.open_settings)
+
+    # Experimental: close-button hover haptic (X11, server-side decorations only)
+    close_haptic = getattr(radial_menu, "close_haptic", None)
+    if close_haptic is not None and close_haptic.available:
+        import close_button_haptic
+
+        ch_action = menu.addAction(_("Haptic on close button (X)"))
+        ch_action.setCheckable(True)
+        ch_action.setChecked(close_button_haptic.load_enabled())
+
+        def _toggle_close_haptic(checked):
+            close_button_haptic.set_enabled(checked)
+            if checked:
+                close_haptic.start()
+            else:
+                close_haptic.stop()
+
+        ch_action.toggled.connect(_toggle_close_haptic)
+
+    # Haptic on desktop notifications
+    notif_haptic = getattr(radial_menu, "notif_haptic", None)
+    if notif_haptic is not None and notif_haptic.available:
+        import notification_haptic
+
+        nh_action = menu.addAction(_("Haptic on notifications"))
+        nh_action.setCheckable(True)
+        nh_action.setChecked(notification_haptic.load_enabled())
+
+        # The watcher is always running; the flag just gates whether it pulses.
+        def _toggle_notif_haptic(checked):
+            notification_haptic.set_enabled(checked)
+
+        nh_action.toggled.connect(_toggle_notif_haptic)
 
     menu.addSeparator()
 

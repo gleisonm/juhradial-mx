@@ -40,6 +40,10 @@ pub struct HapticEventConfig {
     /// Pattern for invalid/blocked actions (default: angry_alert)
     #[serde(default = "default_invalid")]
     pub invalid: String,
+
+    /// Pattern when a desktop notification arrives (default: happy_alert)
+    #[serde(default = "default_notification")]
+    pub notification: String,
 }
 
 fn default_menu_appear() -> String {
@@ -54,6 +58,9 @@ fn default_confirm() -> String {
 fn default_invalid() -> String {
     "angry_alert".to_string()
 }
+fn default_notification() -> String {
+    "happy_alert".to_string()
+}
 
 impl Default for HapticEventConfig {
     fn default() -> Self {
@@ -62,6 +69,7 @@ impl Default for HapticEventConfig {
             slice_change: default_slice_change(),
             confirm: default_confirm(),
             invalid: default_invalid(),
+            notification: default_notification(),
         }
     }
 }

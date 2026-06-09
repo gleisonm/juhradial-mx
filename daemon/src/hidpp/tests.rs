@@ -252,6 +252,7 @@ fn test_per_event_pattern_get() {
         slice_change: Mx4HapticPattern::DampStateChange,
         confirm: Mx4HapticPattern::AngryAlert,
         invalid: Mx4HapticPattern::SharpStateChange,
+        notification: Mx4HapticPattern::HappyAlert,
     };
 
     assert_eq!(
@@ -317,6 +318,7 @@ fn test_from_config_with_per_event() {
             slice_change: "sharp_state_change".to_string(),
             confirm: "angry_alert".to_string(),
             invalid: "subtle_collision".to_string(),
+            notification: "happy_alert".to_string(),
         },
         debounce_ms: 25,
         slice_debounce_ms: 20,
@@ -351,6 +353,7 @@ fn test_update_from_config_with_per_event() {
             slice_change: "angry_alert".to_string(),
             confirm: "damp_state_change".to_string(),
             invalid: "subtle_collision".to_string(),
+            notification: "happy_alert".to_string(),
         },
         debounce_ms: 30,
         slice_debounce_ms: 20,
