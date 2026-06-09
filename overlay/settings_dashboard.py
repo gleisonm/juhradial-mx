@@ -65,6 +65,7 @@ from settings_page_flow import FlowPage
 from settings_page_settings import SettingsPage
 from settings_page_macros import MacrosPage
 from settings_page_gaming import GamingPage
+from settings_page_ai import AIPage
 
 
 # =============================================================================
@@ -705,6 +706,9 @@ class SettingsWindow(SidebarMixin, Adw.ApplicationWindow):
             ),
             "gaming",
         )
+
+        # AI Prompt Builder - available in all modes (no device dependency)
+        self.content_stack.add_named(AIPage(), "ai")
 
     def _create_status_bar(self):
         status = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
