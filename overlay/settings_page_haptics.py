@@ -123,6 +123,48 @@ class HapticsPage(Gtk.ScrolledWindow):
 
         content.append(events_card)
 
+        # Desktop notification haptics
+        notif_card = SettingsCard(_("Notification Haptics"))
+
+        notif_enable_row = SettingRow(
+            _("Haptic on Notifications"),
+            _("Feel a pulse whenever a desktop notification arrives"),
+        )
+        notif_switch = Gtk.Switch()
+        notif_switch.set_active(
+            config.get("haptics", "notify_on_notification", default=False)
+        )
+        notif_switch.connect("state-set", self._on_notify_toggled)
+        notif_enable_row.set_control(notif_switch)
+        notif_card.append(notif_enable_row)
+
+        notif_pattern_row = SettingRow(
+            _("Notification Effect"), _("Pattern played when a notification arrives")
+        )
+        notif_pattern = config.get(
+            "haptics", "per_event", "notification", default="happy_alert"
+        )
+        notif_dropdown = self._create_pattern_dropdown(
+            notif_pattern,
+            lambda pattern: config.set(
+                "haptics", "per_event", "notification", pattern
+            ),
+        )
+        # Kept out of self.event_dropdowns so "Apply to All" doesn't clobber it.
+        notif_pattern_row.set_control(notif_dropdown)
+        notif_card.append(notif_pattern_row)
+
+        notif_test_row = SettingRow(
+            _("Test Notification Effect"), _("Feel the notification pattern")
+        )
+        notif_test_button = Gtk.Button(label=_("Test"))
+        notif_test_button.add_css_class("suggested-action")
+        notif_test_button.connect("clicked", self._on_test_notification_clicked)
+        notif_test_row.set_control(notif_test_button)
+        notif_card.append(notif_test_row)
+
+        content.append(notif_card)
+
         # Test button card
         test_card = SettingsCard(_("Test Haptics"))
         test_row = SettingRow(_("Test Pattern"), _("Feel the selected pattern"))
@@ -147,6 +189,35 @@ class HapticsPage(Gtk.ScrolledWindow):
         config.save(show_toast=False)
         self._reload_daemon_config()
         return False
+
+    def _on_notify_toggled(self, switch, state):
+        """Enable/disable haptic on notifications - persist to config.
+
+        The overlay's notification watcher reads this flag live, so no daemon
+        reload is needed here.
+        """
+        config.set("haptics", "notify_on_notification", state)
+        config.save(show_toast=False)
+        return False
+
+    def _on_test_notification_clicked(self, button):
+        """Send a test pulse using the notification pattern via D-Bus."""
+        proxy = self._get_daemon_proxy()
+        if not proxy:
+            logger.warning("Cannot test notification haptic: D-Bus proxy unavailable")
+            return
+        try:
+            proxy.call_sync(
+                "TriggerHaptic",
+                GLib.Variant("(s)", ("notification",)),
+                Gio.DBusCallFlags.NONE,
+                2000,
+                None,
+            )
+            logger.info("Test notification haptic triggered")
+        except Exception as e:
+            logger.error("Failed to send test notification haptic: %s", e)
+            self._daemon_proxy = None
 
     def _create_pattern_dropdown(self, current_value, on_change_callback):
         """Create a Gtk.DropDown for selecting haptic patterns. Uses the

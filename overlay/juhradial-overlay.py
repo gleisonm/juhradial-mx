@@ -470,6 +470,18 @@ class RadialMenu(RadialMenuPaintingMixin, QWidget):
             print(f"[CloseHaptic] init failed: {e}")
             self.close_haptic = None
 
+        # Haptic pulse when a desktop notification arrives. The watcher runs as a
+        # passive bus monitor and gates each pulse on the live config flag, so the
+        # Settings switch and the tray toggle both take effect without a restart.
+        try:
+            import notification_haptic
+
+            self.notif_haptic = notification_haptic.NotificationHaptic()
+            self.notif_haptic.start()
+        except Exception as e:
+            print(f"[NotifHaptic] init failed: {e}")
+            self.notif_haptic = None
+
         # Fade animation
         self.anim = QPropertyAnimation(self, b"windowOpacity")
         self.anim.setDuration(180)
@@ -1277,6 +1289,21 @@ def create_tray_icon(app, radial_menu):
                 close_haptic.stop()
 
         ch_action.toggled.connect(_toggle_close_haptic)
+
+    # Haptic on desktop notifications
+    notif_haptic = getattr(radial_menu, "notif_haptic", None)
+    if notif_haptic is not None and notif_haptic.available:
+        import notification_haptic
+
+        nh_action = menu.addAction(_("Haptic on notifications"))
+        nh_action.setCheckable(True)
+        nh_action.setChecked(notification_haptic.load_enabled())
+
+        # The watcher is always running; the flag just gates whether it pulses.
+        def _toggle_notif_haptic(checked):
+            notification_haptic.set_enabled(checked)
+
+        nh_action.toggled.connect(_toggle_notif_haptic)
 
     menu.addSeparator()
 
