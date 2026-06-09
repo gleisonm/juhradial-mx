@@ -70,4 +70,41 @@ cp "$DEV_DIR"/assets/settings-generated/easyswitch.png "$SHARE_DIR/assets/settin
 cp "$DEV_DIR"/assets/settings-generated/haptics.png "$SHARE_DIR/assets/settings-generated/" 2>/dev/null || true
 
 echo ""
-echo "Done! Use your keyboard shortcut to start JuhRadial MX."
+echo "=== Restarting JuhRadial MX ==="
+
+# We stopped the daemon/overlay at the top; bring them back so the user does not
+# have to. These run in the user's session (not root), so re-enter it via the
+# invoking user's runtime dir / session bus. Everything is best-effort: a failed
+# restart must never abort the install (note the `|| true` and `set -e`).
+REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "")}"
+if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+    USER_UID="$(id -u "$REAL_USER")"
+    RUNTIME_DIR="/run/user/$USER_UID"
+    run_as_user() {
+        sudo -u "$REAL_USER" \
+            XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+            "$@"
+    }
+
+    # Daemon: prefer the enabled systemd user service, else launch the binary.
+    if run_as_user systemctl --user cat juhradialmx-daemon.service >/dev/null 2>&1; then
+        run_as_user systemctl --user restart juhradialmx-daemon.service || true
+    else
+        run_as_user setsid /usr/local/bin/juhradiald >/dev/null 2>&1 < /dev/null &
+    fi
+
+    # Overlay: graphical app, so hand it the session's display. Guess the Wayland
+    # socket from the runtime dir; fall back to X11 :0.
+    WAYLAND_SOCK="$(basename "$(ls "$RUNTIME_DIR"/wayland-* 2>/dev/null | grep -v '\.lock$' | head -1)" 2>/dev/null || echo "")"
+    OVERLAY_PY="$SHARE_DIR/juhradial-overlay.py"
+    [ -f "$OVERLAY_PY" ] || OVERLAY_PY="$INSTALL_DIR/overlay/juhradial-overlay.py"
+    run_as_user env \
+        WAYLAND_DISPLAY="${WAYLAND_SOCK:-wayland-0}" \
+        DISPLAY="${DISPLAY:-:0}" \
+        setsid python3 "$OVERLAY_PY" >/dev/null 2>&1 < /dev/null &
+
+    echo "Done! Daemon + overlay restarted for $REAL_USER."
+else
+    echo "Done! Could not detect the desktop user - start JuhRadial MX with your keyboard shortcut."
+fi
