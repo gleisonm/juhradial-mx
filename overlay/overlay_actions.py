@@ -106,12 +106,18 @@ def load_radial_image():
 # ACTION DEFINITIONS
 # =============================================================================
 
+# Each AI submenu entry opens the Prompt Builder forced to that engine. The
+# command field carries the engine code consumed by open_ai_prompt_builder().
 AI_SUBMENU = [
-    ("Claude", "url", "https://claude.ai", "claude"),
-    ("ChatGPT", "url", "https://chat.openai.com", "chatgpt"),
-    ("Gemini", "url", "https://gemini.google.com", "gemini"),
-    ("Perplexity", "url", "https://perplexity.ai", "perplexity"),
+    ("Claude", "ai_prompt", "claude", "claude"),
+    ("ChatGPT", "ai_prompt", "chatgpt", "chatgpt"),
+    ("Gemini", "ai_prompt", "gemini", "gemini"),
 ]
+
+
+def build_ai_submenu():
+    """AI submenu: one entry per engine (Claude / ChatGPT / Gemini)."""
+    return list(AI_SUBMENU)
 
 # Easy-Switch submenu - built dynamically in load_actions_from_config()
 EASY_SWITCH_SUBMENU = [
@@ -205,8 +211,8 @@ def load_actions_from_config():
                 # Map GTK icon name to internal icon ID
                 icon = ICON_NAME_MAP.get(gtk_icon, "settings")
 
-                # Handle submenu type (use AI_SUBMENU as default)
-                submenu = AI_SUBMENU if action_type == "submenu" else None
+                # Handle submenu type (AI submenu honors the show-shortcuts flag)
+                submenu = build_ai_submenu() if action_type == "submenu" else None
 
                 # Check if Easy-Switch shortcuts are enabled and this is the Emoji slot (index 5)
                 if easy_switch_enabled and i == 5:
@@ -321,6 +327,47 @@ def load_os_icons():
 # =============================================================================
 
 
+def open_ai_prompt_builder(engine=None):
+    """Capture the current text selection and launch the AI Prompt Builder.
+
+    Selection capture happens here, in the overlay process, while the user's
+    application still holds focus (the radial overlay is a non-focusable Tool
+    window). The captured text is handed to the builder on stdin so the builder
+    never has to grab the selection itself after stealing focus.
+
+    ``engine`` (claude/chatgpt/gemini) forces a specific AI engine; None uses the
+    configured default backend.
+    """
+    builder = os.path.join(os.path.dirname(__file__), "ai_prompt_builder.py")
+    extra = ["--engine", str(engine)] if engine else []
+    try:
+        import ai_selection
+        from ai_config import load_ai_config
+
+        cfg = load_ai_config()
+        selected, _saved = ai_selection.capture_selection(
+            delay_ms=int(cfg.get("capture_delay_ms", 120)),
+            preserve_clipboard=bool(cfg.get("preserve_clipboard", True)),
+        )
+        proc = subprocess.Popen(
+            ["python3", builder, "--stdin", *extra],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        proc.stdin.write(selected or "")
+        proc.stdin.close()
+    except Exception as e:
+        print(f"Error launching AI Prompt Builder: {e}")
+        # Fallback: let the builder self-capture the selection.
+        subprocess.Popen(
+            ["python3", builder, *extra],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
 def open_settings():
     """Launch or refocus the settings dashboard.
 
@@ -407,3 +454,25 @@ def load_minimal_mode():
     except (OSError, ValueError, KeyError):
         pass  # Config file missing or malformed
     return False
+
+
+def load_kde_recomposite_workaround():
+    """Read radial.kde_recomposite_workaround from config.json.
+
+    When True (default), the overlay micro-oscillates its position by 1px each
+    frame on KDE to force KWin to re-composite animated/shader wallpapers behind
+    it. This prevents a frozen wallpaper rectangle but makes the ring visibly
+    tremble, so users without animated wallpapers can disable it.
+    """
+    import json
+    from pathlib import Path
+
+    config_path = Path.home() / ".config" / "juhradial" / "config.json"
+    try:
+        if config_path.exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            return bool(cfg.get("radial", {}).get("kde_recomposite_workaround", True))
+    except (OSError, ValueError, KeyError):
+        pass  # Config file missing or malformed
+    return True
