@@ -101,15 +101,23 @@ fn load_hw_profiles(path: &Path) -> Vec<(String, DeviceSettings)> {
         }
     };
 
-    // Gather candidate profile objects from whichever schema is on disk.
-    let candidates: Vec<serde_json::Value> =
-        if let Some(arr) = value.get("profiles").and_then(|p| p.as_array()) {
-            arr.clone()
-        } else if let Some(obj) = value.as_object() {
-            obj.values().cloned().collect()
-        } else {
-            Vec::new()
-        };
+    // Gather candidate profile objects from BOTH schemas. A real file can
+    // contain both at once: the daemon seeds the typed {version, profiles: []}
+    // shape, and the Settings UI then appends flat {name: {...}} keys next to
+    // it. So we scan the "profiles" array AND the other top-level object values,
+    // skipping the structural "version"/"profiles" keys.
+    let mut candidates: Vec<serde_json::Value> = Vec::new();
+    if let Some(arr) = value.get("profiles").and_then(|p| p.as_array()) {
+        candidates.extend(arr.iter().cloned());
+    }
+    if let Some(obj) = value.as_object() {
+        for (key, v) in obj {
+            if key == "version" || key == "profiles" {
+                continue;
+            }
+            candidates.push(v.clone());
+        }
+    }
 
     let mut out = Vec::new();
     for v in candidates {
@@ -343,6 +351,31 @@ mod tests {
         assert_eq!(game.smartshift_enabled, Some(false));
         assert_eq!(game.smartshift_threshold, Some(90));
         assert!(resolve(&profiles, "unbound").is_none());
+    }
+
+    #[test]
+    fn test_load_hybrid_schema() {
+        // The real file shape the Settings UI produces: the daemon's typed
+        // {version, profiles:[default]} plus a flat per-app key appended next
+        // to it. Both must be picked up.
+        let json = r#"{
+            "version": 1,
+            "profiles": [
+                {"name": "default", "slices": [null,null,null,null,null,null,null,null]}
+            ],
+            "konsole": {
+                "name": "konsole",
+                "app_class": "konsole",
+                "slices": [],
+                "device": {"dpi": 1000, "smartshift_enabled": true, "smartshift_threshold": 50}
+            }
+        }"#;
+        let f = write_tmp(json);
+        let profiles = load_hw_profiles(f.path());
+        assert_eq!(profiles.len(), 1);
+        let k = resolve(&profiles, "konsole").unwrap();
+        assert_eq!(k.dpi, Some(1000));
+        assert_eq!(k.smartshift_threshold, Some(50));
     }
 
     #[test]
