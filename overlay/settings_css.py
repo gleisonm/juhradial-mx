@@ -861,6 +861,39 @@ tooltip {{
     opacity: 1;
 }}
 
+/* Circular Actions Ring (Logi Options+ style) */
+.ring-slice-chip {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 4px 2px;
+    min-width: 0;
+    box-shadow: none;
+    transition: background 120ms ease, border-color 120ms ease;
+}}
+
+.ring-slice-chip:hover {{
+    background: {row_bg_hover};
+    border-color: {COLORS['accent']};
+}}
+
+.ring-slice-icon {{
+    color: {text_strong};
+}}
+
+.ring-slice-label {{
+    font-size: 10px;
+    font-weight: 500;
+    color: {text_dim};
+    margin-top: 2px;
+}}
+
+.ring-center-label {{
+    font-size: 12px;
+    font-weight: 700;
+    color: {text_strong};
+}}
+
 /* Color picker swatches for slice colors */
 .color-btn-green   {{ background: #1F9D55; border-radius: 6px; border: 2px solid transparent; min-width: 22px; min-height: 22px; }}
 .color-btn-yellow  {{ background: #E0A800; border-radius: 6px; border: 2px solid transparent; min-width: 22px; min-height: 22px; }}

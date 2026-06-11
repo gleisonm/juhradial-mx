@@ -8,6 +8,7 @@ SPDX-License-Identifier: GPL-3.0
 """
 
 import logging
+import math
 
 import gi
 
@@ -19,7 +20,6 @@ from i18n import _
 from settings_config import ConfigManager
 from settings_constants import MOUSE_BUTTONS, translate_radial_label
 from settings_dialogs import SliceConfigDialog
-from settings_widgets import GeneratedAssetHero
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,6 @@ class ButtonsPage(Gtk.ScrolledWindow):
         self._generic_mode = generic_mode
         self._capturing = False
         self._capture_timer = None
-        self.slice_rows = {}  # Store slice row widgets for updating
         self.set_policy(
             Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC
         )  # Allow horizontal scroll when needed
@@ -117,39 +116,15 @@ class ButtonsPage(Gtk.ScrolledWindow):
 
         header_row.append(radial_text)
         radial_card.append(header_row)
-        radial_card.append(
-            GeneratedAssetHero("settings-generated/control-ring.png", max_height=158)
-        )
 
-        # Slices container - 2 columns of 4 slices
-        slices_grid = Gtk.Grid()
-        slices_grid.set_column_spacing(12)
-        slices_grid.set_row_spacing(8)
-        slices_grid.set_column_homogeneous(True)
-
-        # Load current slices from config
-        slices = self._get_current_slices()
-
-        # Position labels (clockwise from top)
-        position_labels = [
-            _("Top"),
-            _("Top Right"),
-            _("Right"),
-            _("Bottom Right"),
-            _("Bottom"),
-            _("Bottom Left"),
-            _("Left"),
-            _("Top Left"),
-        ]
-
-        for i, slice_data in enumerate(slices):
-            row = i % 4
-            col = i // 4
-            slice_widget = self._create_slice_row(i, slice_data, position_labels[i])
-            self.slice_rows[i] = slice_widget
-            slices_grid.attach(slice_widget, col, row, 1, 1)
-
-        radial_card.append(slices_grid)
+        # Interactive circular Actions Ring (mirrors the on-screen radial menu,
+        # matching the Logi Options+ style). Each slice is a clickable chip
+        # placed radially over a coloured ring.
+        self._ring_holder = Gtk.Box()
+        self._ring_holder.set_halign(Gtk.Align.CENTER)
+        self._ring_holder.set_margin_top(6)
+        self._ring_holder.append(self._build_actions_ring(self._get_current_slices()))
+        radial_card.append(self._ring_holder)
         content.append(radial_card)
 
         if self._generic_mode:
@@ -330,67 +305,137 @@ class ButtonsPage(Gtk.ScrolledWindow):
         # Return defaults if no config
         return ConfigManager.DEFAULT_CONFIG["radial_menu"]["slices"]
 
-    def _create_slice_row(self, index, slice_data, position_label):
-        """Create a compact slice row widget"""
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        row.add_css_class("slice-row")
+    # =================================================================
+    # Circular Actions Ring (Logi Options+ style)
+    # =================================================================
+    RING_SIZE = 340
+    RING_INNER = 70
+    RING_OUTER = 158
 
-        # Color indicator dot
-        color_name = slice_data.get("color", "teal")
-        color_hex = self.SLICE_COLORS.get(color_name, "#0abdc6")
-
-        color_dot = Gtk.DrawingArea()
-        color_dot.set_size_request(10, 10)
-        color_dot.set_valign(Gtk.Align.CENTER)
-
-        def draw_dot(area, cr, width, height):
-            # Parse color
-            r = int(color_hex[1:3], 16) / 255.0
-            g = int(color_hex[3:5], 16) / 255.0
-            b = int(color_hex[5:7], 16) / 255.0
-            # Draw filled circle
-            cr.set_source_rgb(r, g, b)
-            cr.arc(width / 2, height / 2, 4, 0, 2 * 3.14159)
-            cr.fill()
-
-        color_dot.set_draw_func(draw_dot)
-        row.append(color_dot)
-
-        # Icon
-        icon_name = slice_data.get("icon", "application-x-executable-symbolic")
-        icon = Gtk.Image.new_from_icon_name(icon_name)
-        icon.set_pixel_size(16)
-        icon.add_css_class("slice-icon")
-        row.append(icon)
-
-        # Label
-        label_text = translate_radial_label(
-            slice_data.get("label", f"Slice {index + 1}"), slice_data.get("action_id")
+    def _hex_rgb(self, color_name):
+        h = self.SLICE_COLORS.get(color_name, "#0abdc6")
+        return (
+            int(h[1:3], 16) / 255.0,
+            int(h[3:5], 16) / 255.0,
+            int(h[5:7], 16) / 255.0,
         )
-        label = Gtk.Label(label=label_text)
-        label.set_halign(Gtk.Align.START)
-        label.set_hexpand(True)
-        label.add_css_class("slice-label")
+
+    def _build_actions_ring(self, slices):
+        """Build the interactive circular ring of slices.
+
+        Geometry mirrors the on-screen radial menu: 8 sectors of 45 degrees,
+        slice 0 centred at the top, going clockwise.
+        """
+        size = self.RING_SIZE
+        cx = cy = size / 2.0
+        icon_r = (self.RING_INNER + self.RING_OUTER) / 2.0
+
+        overlay = Gtk.Overlay()
+        overlay.set_size_request(size, size)
+
+        ring_bg = Gtk.DrawingArea()
+        ring_bg.set_size_request(size, size)
+        ring_bg.set_draw_func(self._draw_ring, list(slices))
+        overlay.set_child(ring_bg)
+
+        fixed = Gtk.Fixed()
+        fixed.set_size_request(size, size)
+
+        chip_w, chip_h = 90, 58
+        for i, slice_data in enumerate(slices[:8]):
+            chip = self._make_slice_chip(i, slice_data)
+            chip.set_size_request(chip_w, chip_h)
+            ang = math.radians(i * 45 - 90)
+            x = cx + icon_r * math.cos(ang) - chip_w / 2.0
+            y = cy + icon_r * math.sin(ang) - chip_h / 2.0
+            fixed.put(chip, x, y)
+
+        center = Gtk.Label(label=_("Actions\nRing"))
+        center.set_justify(Gtk.Justification.CENTER)
+        center.add_css_class("ring-center-label")
+        center.set_size_request(2 * self.RING_INNER - 16, 40)
+        fixed.put(center, cx - (self.RING_INNER - 8), cy - 20)
+
+        overlay.add_overlay(fixed)
+        return overlay
+
+    def _draw_ring(self, area, cr, width, height, slices):
+        """Paint the coloured donut segments behind the slice chips."""
+        cx, cy = width / 2.0, height / 2.0
+        inner, outer = self.RING_INNER, self.RING_OUTER
+
+        for i, sd in enumerate(slices[:8]):
+            a0 = math.radians(i * 45 - 22.5 - 90)
+            a1 = math.radians(i * 45 + 22.5 - 90)
+            r, g, b = self._hex_rgb(sd.get("color", "teal"))
+
+            cr.new_path()
+            cr.arc(cx, cy, outer, a0, a1)
+            cr.arc_negative(cx, cy, inner, a1, a0)
+            cr.close_path()
+            cr.set_source_rgba(r, g, b, 0.16)
+            cr.fill_preserve()
+            cr.set_source_rgba(r, g, b, 0.55)
+            cr.set_line_width(1.0)
+            cr.stroke()
+
+            # Brighter accent arc on the outer rim
+            cr.new_path()
+            cr.arc(cx, cy, outer - 1.5, a0 + 0.02, a1 - 0.02)
+            cr.set_source_rgba(r, g, b, 0.9)
+            cr.set_line_width(2.5)
+            cr.stroke()
+
+        # Centre disc
+        cr.new_path()
+        cr.arc(cx, cy, inner - 4, 0, 2 * math.pi)
+        cr.set_source_rgba(1, 1, 1, 0.04)
+        cr.fill_preserve()
+        cr.set_source_rgba(1, 1, 1, 0.12)
+        cr.set_line_width(1.0)
+        cr.stroke()
+
+    def _make_slice_chip(self, index, slice_data):
+        """A clickable icon+label chip for one slice."""
+        chip = Gtk.Button()
+        chip.add_css_class("ring-slice-chip")
+        chip.add_css_class("flat")
+        chip.connect("clicked", lambda _, idx=index: self._on_edit_slice(idx))
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        box.set_halign(Gtk.Align.CENTER)
+        box.set_valign(Gtk.Align.CENTER)
+
+        icon = Gtk.Image.new_from_icon_name(
+            slice_data.get("icon", "application-x-executable-symbolic")
+        )
+        icon.set_pixel_size(22)
+        icon.add_css_class("ring-slice-icon")
+        box.append(icon)
+
+        label = Gtk.Label(
+            label=translate_radial_label(
+                slice_data.get("label", f"Slice {index + 1}"),
+                slice_data.get("action_id"),
+            )
+        )
+        label.add_css_class("ring-slice-label")
         label.set_ellipsize(Pango.EllipsizeMode.END)
-        row.append(label)
+        label.set_max_width_chars(11)
+        label.set_justify(Gtk.Justification.CENTER)
+        box.append(label)
 
-        # Edit button (arrow)
-        edit_btn = Gtk.Button()
-        edit_btn.set_child(Gtk.Image.new_from_icon_name("go-next-symbolic"))
-        edit_btn.add_css_class("slice-edit-btn")
-        edit_btn.add_css_class("flat")
-        edit_btn.set_valign(Gtk.Align.CENTER)
-        edit_btn.connect("clicked", lambda _, idx=index: self._on_edit_slice(idx))
-        row.append(edit_btn)
+        chip.set_child(box)
+        return chip
 
-        # Make entire row clickable
-        row_click = Gtk.GestureClick()
-        row_click.connect(
-            "released", lambda g, n, x, y, idx=index: self._on_edit_slice(idx)
-        )
-        row.add_controller(row_click)
-
-        return row
+    def _refresh_ring(self):
+        """Rebuild the ring after slices change."""
+        if not hasattr(self, "_ring_holder"):
+            return
+        child = self._ring_holder.get_first_child()
+        if child:
+            self._ring_holder.remove(child)
+        self._ring_holder.append(self._build_actions_ring(self._get_current_slices()))
 
     def _on_edit_slice(self, slice_index):
         """Open dialog to edit a specific slice"""
@@ -404,53 +449,15 @@ class ButtonsPage(Gtk.ScrolledWindow):
             dialog.present()
 
     def _on_slice_saved(self):
-        """Called when a slice is saved - refresh the UI"""
-        # Refresh slices display
-        slices = self._get_current_slices()
-
-        for i, slice_data in enumerate(slices):
-            if i in self.slice_rows:
-                # Update the existing row's content
-                row = self.slice_rows[i]
-                # Find and update the label using GTK4 child iteration
-                child = row.get_first_child()
-                while child:
-                    if isinstance(child, Gtk.Label):
-                        child.set_text(
-                            translate_radial_label(
-                                slice_data.get("label", f"Slice {i + 1}"),
-                                slice_data.get("action_id"),
-                            )
-                        )
-                        break
-                    child = child.get_next_sibling()
+        """Called when a slice is saved - rebuild the ring."""
+        self._refresh_ring()
 
     def _on_easyswitch_toggled(self, switch, state):
         """Handle Easy-Switch shortcuts toggle"""
         self.config_manager.set("radial_menu", "easy_switch_shortcuts", state)
         self.config_manager.save()
-
-        # Update the Emoji slice row to show status
-        if 5 in self.slice_rows:
-            row = self.slice_rows[5]
-            child = row.get_first_child()
-            while child:
-                if isinstance(child, Gtk.Label):
-                    if state:
-                        child.set_text(_("Easy-Switch"))
-                    else:
-                        # Restore original label from config
-                        slices = self._get_current_slices()
-                        if len(slices) > 5:
-                            child.set_text(
-                                translate_radial_label(
-                                    slices[5].get("label", _("Emoji")),
-                                    slices[5].get("action_id"),
-                                )
-                            )
-                    break
-                child = child.get_next_sibling()
-
+        # The Emoji slice label flips to "Easy-Switch"; rebuild to reflect it.
+        self._refresh_ring()
         return False  # Allow switch to change state
 
     # =================================================================
