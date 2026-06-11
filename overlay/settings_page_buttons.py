@@ -411,28 +411,26 @@ class ButtonsPage(Gtk.ScrolledWindow):
         cr.stroke()
 
     def _make_slice_chip(self, index, slice_data):
-        """A clickable icon+label chip for one slice."""
-        chip = Gtk.Button()
+        """A clickable icon+label chip for one slice.
+
+        Plain Gtk.Box (not a Gtk.Button) so there is no theme hover/active
+        rectangle — the hover feedback is the ring wedge instead.
+        """
+        chip = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
         chip.add_css_class("ring-slice-chip")
-        chip.add_css_class("flat")
-        chip.connect("clicked", lambda _, idx=index: self._on_edit_slice(idx))
-
-        # Light up the matching ring wedge on hover (instead of a square chip bg)
-        motion = Gtk.EventControllerMotion()
-        motion.connect("enter", lambda *_a, idx=index: self._set_ring_hover(idx))
-        motion.connect("leave", lambda *_a: self._set_ring_hover(-1))
-        chip.add_controller(motion)
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
-        box.set_halign(Gtk.Align.CENTER)
-        box.set_valign(Gtk.Align.CENTER)
+        chip.set_halign(Gtk.Align.CENTER)
+        chip.set_valign(Gtk.Align.CENTER)
+        try:
+            chip.set_cursor_from_name("pointer")
+        except Exception:
+            pass
 
         icon = Gtk.Image.new_from_icon_name(
             slice_data.get("icon", "application-x-executable-symbolic")
         )
         icon.set_pixel_size(22)
         icon.add_css_class("ring-slice-icon")
-        box.append(icon)
+        chip.append(icon)
 
         label = Gtk.Label(
             label=translate_radial_label(
@@ -444,9 +442,18 @@ class ButtonsPage(Gtk.ScrolledWindow):
         label.set_ellipsize(Pango.EllipsizeMode.END)
         label.set_max_width_chars(11)
         label.set_justify(Gtk.Justification.CENTER)
-        box.append(label)
+        chip.append(label)
 
-        chip.set_child(box)
+        # Click opens the slice editor; hover lights the matching ring wedge.
+        click = Gtk.GestureClick()
+        click.connect(
+            "released", lambda g, n, x, y, idx=index: self._on_edit_slice(idx)
+        )
+        chip.add_controller(click)
+        motion = Gtk.EventControllerMotion()
+        motion.connect("enter", lambda *_a, idx=index: self._set_ring_hover(idx))
+        motion.connect("leave", lambda *_a: self._set_ring_hover(-1))
+        chip.add_controller(motion)
         return chip
 
     def _set_ring_hover(self, index):

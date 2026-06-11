@@ -862,17 +862,11 @@ tooltip {{
 }}
 
 /* Circular Actions Ring (Logi Options+ style) */
-.ring-slice-chip,
-.ring-slice-chip:hover,
-.ring-slice-chip:active,
-.ring-slice-chip:focus {{
+.ring-slice-chip {{
     background: transparent;
     border: none;
-    border-radius: 10px;
     padding: 4px 2px;
-    min-width: 0;
     box-shadow: none;
-    outline: none;
 }}
 
 .ring-slice-icon {{
