@@ -19,46 +19,46 @@ _BASE_MOUSE_BUTTONS = {
     "middle": {
         "name": "Middle Button",
         "action": "Middle Click",
-        "pos": (0.65, 0.27),  # MagSpeed scroll wheel
-        "line_from": "top",
+        "pos": (0.235, 0.441),  # MagSpeed scroll wheel (user-calibrated)
+        "line_from": "left",
     },
     "shift_wheel": {
         "name": "Shift Wheel Mode",
         "action": "SmartShift",
-        "pos": (0.36, 0.18),  # Mode-shift button on top (by the status LED)
+        "pos": (0.426, 0.199),  # Mode-shift button on top
         "line_from": "top",
     },
-    "forward": {
-        "name": "Forward",
-        "action": "Forward",
-        "pos": (0.61, 0.46),  # Upper thumb button (pill)
+    "horizontal_scroll": {
+        "name": "Horizontal Scroll",
+        "action": "Scroll Left/Right",
+        "pos": (0.677, 0.281),  # Thumb wheel
         "line_from": "right",
     },
     "back": {
         "name": "Back",
         "action": "Back",
-        "pos": (0.59, 0.53),  # Lower thumb button (pill)
+        "pos": (0.746, 0.342),  # Back side button
         "line_from": "right",
     },
-    "horizontal_scroll": {
-        "name": "Horizontal Scroll",
-        "action": "Scroll Left/Right",
-        "pos": (0.26, 0.44),  # Ribbed thumb wheel (front of thumb flank)
-        "line_from": "left",
+    "forward": {
+        "name": "Forward",
+        "action": "Forward",
+        "pos": (0.672, 0.449),  # Forward side button
+        "line_from": "right",
     },
     "gesture": {
         "name": "Gestures",
         "action": "Virtual desktops",
-        "pos": (0.47, 0.54),  # Thumb rest / gesture area
+        "pos": (0.568, 0.591),  # Thumb rest / gesture area
         "line_from": "r_up",
-        "label_y": 0.64,
+        "label_y": 0.58,
     },
     "thumb": {
         "name": "Show Actions Ring",
         "action": "Radial Menu",
-        "pos": (0.64, 0.64),  # Haptic Actions Ring panel (6-dot icon)
+        "pos": (0.664, 0.663),  # Haptic Actions Ring panel (6-dot icon)
         "line_from": "r_up",
-        "label_y": 0.76,
+        "label_y": 0.74,
     },
 }
 
