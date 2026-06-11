@@ -32,6 +32,94 @@ from settings_widgets import (
 class DevicesPage(Gtk.ScrolledWindow):
     """Device information and management page"""
 
+    def _toast(self, msg):
+        root = self.get_root()
+        if root is not None and hasattr(root, "show_toast"):
+            root.show_toast(msg)
+
+    def _build_device_layout_card(self):
+        """Card showing the device image with hotspots + a drag-to-edit base.
+
+        Driven entirely by the matched JSON descriptor; returns None when no
+        descriptor matches the connected device.
+        """
+        try:
+            from device_descriptors import match_descriptor
+            from device_image_view import DeviceImageView
+        except Exception:  # noqa: BLE001 - feature is optional
+            return None
+
+        descriptor = match_descriptor(name=get_device_name())
+        if descriptor is None:
+            return None
+
+        card = SettingsCard(_("Device Layout"))
+
+        view = DeviceImageView(descriptor, display_width=320)
+        view.set_margin_top(8)
+        view.set_margin_bottom(8)
+        card.append(view)
+
+        # Capability chips driven by the descriptor's feature flags.
+        feats = [
+            ("battery", _("Battery")),
+            ("dpi", _("DPI")),
+            ("smartshift", _("SmartShift")),
+            ("thumbwheel", _("Thumb wheel")),
+            ("haptic", _("Haptics")),
+            ("easyswitch", _("Easy-Switch")),
+            ("gestures", _("Gestures")),
+        ]
+        chips = Gtk.FlowBox()
+        chips.set_selection_mode(Gtk.SelectionMode.NONE)
+        chips.set_max_children_per_line(4)
+        chips.set_column_spacing(6)
+        chips.set_row_spacing(6)
+        chips.set_margin_bottom(8)
+        for key, label in feats:
+            if descriptor.has_feature(key):
+                chip = Gtk.Label(label=label)
+                chip.add_css_class("dim-label")
+                chip.add_css_class("caption")
+                chips.append(chip)
+        card.append(chips)
+
+        # Edit toggle + Save layout.
+        controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        edit_toggle = Gtk.ToggleButton(label=_("Edit hotspots"))
+        save_btn = Gtk.Button(label=_("Save layout"))
+        save_btn.set_sensitive(False)
+        save_btn.add_css_class("suggested-action")
+
+        view.on_dirty = lambda dirty: save_btn.set_sensitive(dirty)
+        edit_toggle.connect(
+            "toggled", lambda b: view.set_editable(b.get_active())
+        )
+
+        def _on_save(_btn):
+            if view.save():
+                save_btn.set_sensitive(False)
+                self._toast(_("Layout saved"))
+            else:
+                self._toast(_("Failed to save layout"))
+
+        save_btn.connect("clicked", _on_save)
+
+        controls.append(edit_toggle)
+        controls.append(save_btn)
+        card.append(controls)
+
+        hint = Gtk.Label(
+            label=_("Turn on Edit, drag the dots to match your mouse, then Save.")
+        )
+        hint.add_css_class("dim-label")
+        hint.set_wrap(True)
+        hint.set_xalign(0.0)
+        hint.set_margin_top(4)
+        card.append(hint)
+
+        return card
+
     def __init__(self):
         super().__init__()
         self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -170,6 +258,12 @@ class DevicesPage(Gtk.ScrolledWindow):
         device_card.append(fw_row)
 
         content.append(device_card)
+
+        # Visual device layout (image + hotspots) from the JSON descriptor
+        if not self._is_generic:
+            layout_card = self._build_device_layout_card()
+            if layout_card is not None:
+                content.append(layout_card)
 
         # Additional Info Card (quieter styling)
         info_card = InfoCard(_("Device Management"))

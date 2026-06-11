@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "JuhRadial MX device descriptor",
+  "description": "Self-contained description of a supported mouse: which product IDs it covers, which HID++ capabilities it exposes (drives UI visibility), its remappable controls, and hotspot positions for the device image.",
+  "type": "object",
+  "required": ["id", "name", "productIds"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": {
+      "type": "string",
+      "description": "Stable slug, also the directory name (e.g. \"mx-master-4\").",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "name": { "type": "string", "description": "Human-readable model name." },
+    "status": {
+      "type": "string",
+      "enum": ["verified", "beta", "experimental"],
+      "default": "beta",
+      "description": "How well this descriptor is tested on real hardware."
+    },
+    "productIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^0x[0-9a-fA-F]{4}$" },
+      "description": "USB/Bolt/Bluetooth product IDs this descriptor matches."
+    },
+    "features": {
+      "type": "object",
+      "description": "Capability flags. Set false to hide the related controls in the UI for this model. Runtime HID++ enumeration still has the final say on the daemon side.",
+      "additionalProperties": false,
+      "properties": {
+        "battery": { "type": "boolean", "default": false },
+        "dpi": { "type": "boolean", "default": false },
+        "smartshift": { "type": "boolean", "default": false },
+        "hiresscroll": { "type": "boolean", "default": false },
+        "thumbwheel": { "type": "boolean", "default": false },
+        "haptic": { "type": "boolean", "default": false },
+        "easyswitch": { "type": "boolean", "default": false },
+        "reprogControls": { "type": "boolean", "default": false },
+        "gestures": { "type": "boolean", "default": false }
+      }
+    },
+    "dpi": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer" },
+        "max": { "type": "integer" },
+        "step": { "type": "integer" }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "description": "Remappable buttons / controls.",
+      "items": {
+        "type": "object",
+        "required": ["cid", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "cid": { "type": "string", "pattern": "^0x[0-9a-fA-F]{1,4}$", "description": "HID++ control ID." },
+          "name": { "type": "string" },
+          "evdev": { "type": "string", "pattern": "^0x[0-9a-fA-F]{1,4}$", "description": "Fallback evdev key code, when the control also arrives as a normal input event." },
+          "divertable": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "hotspots": {
+      "type": "array",
+      "description": "Callout positions over the device image, as fractions (0..1) of width/height.",
+      "items": {
+        "type": "object",
+        "required": ["xPct", "yPct"],
+        "additionalProperties": false,
+        "properties": {
+          "cid": { "type": "string", "description": "Control this hotspot points at; omit/-1 kinds for scroll/sensor zones." },
+          "kind": { "type": "string", "enum": ["button", "scrollwheel", "thumbwheel", "pointer"], "default": "button" },
+          "label": { "type": "string" },
+          "xPct": { "type": "number", "minimum": 0, "maximum": 1 },
+          "yPct": { "type": "number", "minimum": 0, "maximum": 1 },
+          "side": { "type": "string", "enum": ["left", "right"], "default": "right" }
+        }
+      }
+    },
+    "easySwitchSlots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["xPct", "yPct"],
+        "additionalProperties": false,
+        "properties": {
+          "xPct": { "type": "number", "minimum": 0, "maximum": 1 },
+          "yPct": { "type": "number", "minimum": 0, "maximum": 1 },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "image": {
+      "type": "string",
+      "description": "Image file name, resolved against the bundled assets/devices/ directory."
+    }
+  }
+}
