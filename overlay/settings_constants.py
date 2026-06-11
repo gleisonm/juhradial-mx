@@ -19,46 +19,46 @@ _BASE_MOUSE_BUTTONS = {
     "middle": {
         "name": "Middle Button",
         "action": "Middle Click",
-        "pos": (0.67, 0.27),  # Top of MagSpeed scroll wheel
+        "pos": (0.65, 0.27),  # MagSpeed scroll wheel
         "line_from": "top",
     },
     "shift_wheel": {
         "name": "Shift Wheel Mode",
         "action": "SmartShift",
-        "pos": (0.35, 0.20),  # Mode-shift button on top (by the status LED)
+        "pos": (0.36, 0.18),  # Mode-shift button on top (by the status LED)
         "line_from": "top",
     },
     "forward": {
         "name": "Forward",
         "action": "Forward",
-        "pos": (0.61, 0.42),  # Upper thumb button (pill)
+        "pos": (0.61, 0.46),  # Upper thumb button (pill)
         "line_from": "right",
     },
     "back": {
         "name": "Back",
         "action": "Back",
-        "pos": (0.60, 0.50),  # Lower thumb button (pill)
+        "pos": (0.59, 0.53),  # Lower thumb button (pill)
         "line_from": "right",
     },
     "horizontal_scroll": {
         "name": "Horizontal Scroll",
         "action": "Scroll Left/Right",
-        "pos": (0.28, 0.46),  # Ribbed thumb wheel (front of thumb flank)
+        "pos": (0.26, 0.44),  # Ribbed thumb wheel (front of thumb flank)
         "line_from": "left",
     },
     "gesture": {
         "name": "Gestures",
         "action": "Virtual desktops",
-        "pos": (0.54, 0.56),  # Thumb rest / gesture area
+        "pos": (0.47, 0.54),  # Thumb rest / gesture area
         "line_from": "r_up",
-        "label_y": 0.60,
+        "label_y": 0.64,
     },
     "thumb": {
         "name": "Show Actions Ring",
         "action": "Radial Menu",
-        "pos": (0.64, 0.62),  # Haptic Actions Ring panel (6-dot icon)
+        "pos": (0.64, 0.64),  # Haptic Actions Ring panel (6-dot icon)
         "line_from": "r_up",
-        "label_y": 0.74,
+        "label_y": 0.76,
     },
 }
 
