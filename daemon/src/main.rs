@@ -253,6 +253,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Clone haptic_manager for battery updater before passing to D-Bus
     let haptic_manager_for_battery = haptic_manager.clone();
+    // Clone for the per-app hardware profile switcher (Story 3.3)
+    let haptic_manager_for_switcher = haptic_manager.clone();
 
     // Determine device mode:
     // 1. Check config for user override (settings "Generic" toggle)
@@ -439,9 +441,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("Window tracking unavailable - using default profile only");
     }
 
-    // Store for later use in Story 3.3 (window-based profile switching)
+    // The WindowTracker (KWin/Wayland) is kept for a future Wayland focus path;
+    // the switcher below uses X11 focus detection. ProfileManager is reloaded
+    // inside the switcher task, so we don't need to hold these here.
     let _window_tracker = window_tracker;
     let _profile_manager = profile_manager;
+
+    // Spawn the per-app hardware profile switcher (Story 3.3): watches the
+    // focused window and applies that app's DPI/SmartShift overrides on top of
+    // the user's base settings.
+    {
+        let switcher_config = shared_config.clone();
+        tokio::spawn(async move {
+            juhradiald::profile_switcher::run_profile_switcher(
+                haptic_manager_for_switcher,
+                switcher_config,
+            )
+            .await
+        });
+    }
 
     // Start inotify watcher on /dev/input/ for instant device hotplug detection.
     // Shared across both evdev loops so they re-scan immediately on device changes.

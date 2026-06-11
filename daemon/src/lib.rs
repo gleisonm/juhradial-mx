@@ -15,6 +15,7 @@ pub mod hidpp;
 pub mod hidraw;
 pub mod macros;
 pub mod performance_monitor;
+pub mod profile_switcher;
 pub mod profiles;
 pub mod theme;
 pub mod theme_watcher;

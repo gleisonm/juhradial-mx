@@ -642,9 +642,127 @@ class AppProfileSlicesDialog(Adw.Window):
             row.append(dropdown)
             content.append(row)
 
+        self._build_hardware_section(content)
+
         scrolled.set_child(content)
         main_box.append(scrolled)
         self.set_content(main_box)
+
+    def _build_hardware_section(self, content):
+        """Per-app hardware overrides (DPI / SmartShift), Logitune-style.
+
+        Each control has an 'Override' switch; when off, that setting is left
+        out of the profile and the daemon keeps the user's global value.
+        """
+        device = self.profile.get("device", {})
+        if not isinstance(device, dict):
+            device = {}
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep.set_margin_top(8)
+        content.append(sep)
+
+        hw_label = Gtk.Label(label=_("Hardware (optional)"))
+        hw_label.add_css_class("heading")
+        hw_label.set_halign(Gtk.Align.START)
+        hw_label.set_margin_top(8)
+        content.append(hw_label)
+
+        hw_desc = Gtk.Label(
+            label=_(
+                "Apply DPI / SmartShift only while this app is focused. "
+                "Leave a switch off to keep your global setting."
+            )
+        )
+        hw_desc.set_wrap(True)
+        hw_desc.set_xalign(0.0)
+        hw_desc.add_css_class("dim-label")
+        content.append(hw_desc)
+
+        # --- DPI override ---
+        dpi_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        dpi_row.add_css_class("setting-row")
+        dpi_lbl = Gtk.Label(label=_("Override DPI"))
+        dpi_lbl.set_xalign(0.0)
+        dpi_lbl.set_hexpand(True)
+        dpi_row.append(dpi_lbl)
+        self.dpi_override = Gtk.Switch()
+        self.dpi_override.set_valign(Gtk.Align.CENTER)
+        dpi_row.append(self.dpi_override)
+        content.append(dpi_row)
+
+        self.dpi_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 400, 8000, 50
+        )
+        self.dpi_scale.set_draw_value(True)
+        self.dpi_scale.set_hexpand(True)
+        self.dpi_scale.set_value(int(device.get("dpi", 1000)))
+        content.append(self.dpi_scale)
+
+        has_dpi = "dpi" in device
+        self.dpi_override.set_active(has_dpi)
+        self.dpi_scale.set_sensitive(has_dpi)
+        self.dpi_override.connect(
+            "state-set",
+            lambda _s, state: (self.dpi_scale.set_sensitive(state), False)[1],
+        )
+
+        # --- SmartShift override ---
+        ss_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        ss_row.add_css_class("setting-row")
+        ss_lbl = Gtk.Label(label=_("Override SmartShift"))
+        ss_lbl.set_xalign(0.0)
+        ss_lbl.set_hexpand(True)
+        ss_row.append(ss_lbl)
+        self.ss_override = Gtk.Switch()
+        self.ss_override.set_valign(Gtk.Align.CENTER)
+        ss_row.append(self.ss_override)
+        content.append(ss_row)
+
+        ss_en_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        ss_en_lbl = Gtk.Label(label=_("SmartShift enabled"))
+        ss_en_lbl.set_xalign(0.0)
+        ss_en_lbl.set_hexpand(True)
+        ss_en_row.append(ss_en_lbl)
+        self.ss_enabled = Gtk.Switch()
+        self.ss_enabled.set_valign(Gtk.Align.CENTER)
+        ss_en_row.append(self.ss_enabled)
+        content.append(ss_en_row)
+
+        self.ss_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 1, 100, 1
+        )
+        self.ss_scale.set_draw_value(True)
+        self.ss_scale.set_hexpand(True)
+        self.ss_scale.set_value(int(device.get("smartshift_threshold", 50)))
+        content.append(self.ss_scale)
+
+        has_ss = ("smartshift_enabled" in device) or (
+            "smartshift_threshold" in device
+        )
+        self.ss_override.set_active(has_ss)
+        self.ss_enabled.set_active(bool(device.get("smartshift_enabled", True)))
+        self.ss_enabled.set_sensitive(has_ss)
+        self.ss_scale.set_sensitive(has_ss)
+
+        def _toggle_ss(_s, state):
+            self.ss_enabled.set_sensitive(state)
+            self.ss_scale.set_sensitive(state)
+            return False
+
+        self.ss_override.connect("state-set", _toggle_ss)
+
+    def _collect_device_settings(self):
+        """Build the `device` dict from the hardware override widgets.
+
+        Returns None when nothing is overridden (so the key is omitted)."""
+        device = {}
+        if getattr(self, "dpi_override", None) and self.dpi_override.get_active():
+            device["dpi"] = int(self.dpi_scale.get_value())
+        if getattr(self, "ss_override", None) and self.ss_override.get_active():
+            device["smartshift_enabled"] = bool(self.ss_enabled.get_active())
+            device["smartshift_threshold"] = int(self.ss_scale.get_value())
+        return device or None
 
     def _load_profile(self, app_name):
         profiles = {}
@@ -704,11 +822,15 @@ class AppProfileSlicesDialog(Adw.Window):
         if not isinstance(profiles, dict):
             profiles = {}
 
-        profiles[self.app_name] = {
+        entry = {
             "name": self.app_name,
             "app_class": self.app_name,
             "slices": new_slices,
         }
+        device = self._collect_device_settings()
+        if device:
+            entry["device"] = device
+        profiles[self.app_name] = entry
 
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = str(self.profile_path) + ".tmp"
