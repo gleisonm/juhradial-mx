@@ -19,8 +19,8 @@ _BASE_MOUSE_BUTTONS = {
     "middle": {
         "name": "Middle Button",
         "action": "Middle Click",
-        "pos": (0.235, 0.441),  # MagSpeed scroll wheel (user-calibrated)
-        "line_from": "left",
+        "pos": (0.677, 0.281),  # MagSpeed scroll wheel (central metal wheel)
+        "line_from": "top",
     },
     "shift_wheel": {
         "name": "Shift Wheel Mode",
@@ -31,8 +31,8 @@ _BASE_MOUSE_BUTTONS = {
     "horizontal_scroll": {
         "name": "Horizontal Scroll",
         "action": "Scroll Left/Right",
-        "pos": (0.677, 0.281),  # Thumb wheel
-        "line_from": "right",
+        "pos": (0.235, 0.441),  # Diagonal thumb wheel (left flank)
+        "line_from": "left",
     },
     "back": {
         "name": "Back",
