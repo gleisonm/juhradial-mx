@@ -862,19 +862,17 @@ tooltip {{
 }}
 
 /* Circular Actions Ring (Logi Options+ style) */
-.ring-slice-chip {{
+.ring-slice-chip,
+.ring-slice-chip:hover,
+.ring-slice-chip:active,
+.ring-slice-chip:focus {{
     background: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 10px;
     padding: 4px 2px;
     min-width: 0;
     box-shadow: none;
-    transition: background 120ms ease, border-color 120ms ease;
-}}
-
-.ring-slice-chip:hover {{
-    background: {row_bg_hover};
-    border-color: {COLORS['accent']};
+    outline: none;
 }}
 
 .ring-slice-icon {{

@@ -337,6 +337,10 @@ class ButtonsPage(Gtk.ScrolledWindow):
         ring_bg.set_size_request(size, size)
         ring_bg.set_draw_func(self._draw_ring, list(slices))
         overlay.set_child(ring_bg)
+        # Hover highlight is painted on the ring itself (as the wedge shape),
+        # not on the chips, so the chips stay transparent.
+        self._ring_bg = ring_bg
+        self._ring_hover = -1
 
         fixed = Gtk.Fixed()
         fixed.set_size_request(size, size)
@@ -364,26 +368,37 @@ class ButtonsPage(Gtk.ScrolledWindow):
         cx, cy = width / 2.0, height / 2.0
         inner, outer = self.RING_INNER, self.RING_OUTER
 
+        hover = getattr(self, "_ring_hover", -1)
         for i, sd in enumerate(slices[:8]):
             a0 = math.radians(i * 45 - 22.5 - 90)
             a1 = math.radians(i * 45 + 22.5 - 90)
             r, g, b = self._hex_rgb(sd.get("color", "teal"))
+            hot = (i == hover)
 
             cr.new_path()
             cr.arc(cx, cy, outer, a0, a1)
             cr.arc_negative(cx, cy, inner, a1, a0)
             cr.close_path()
-            cr.set_source_rgba(r, g, b, 0.16)
+            cr.set_source_rgba(r, g, b, 0.40 if hot else 0.16)
             cr.fill_preserve()
-            cr.set_source_rgba(r, g, b, 0.55)
-            cr.set_line_width(1.0)
+            cr.set_source_rgba(r, g, b, 0.95 if hot else 0.55)
+            cr.set_line_width(1.5 if hot else 1.0)
             cr.stroke()
+
+            if hot:
+                # Soft white lift over the hovered wedge for extra feedback
+                cr.new_path()
+                cr.arc(cx, cy, outer, a0, a1)
+                cr.arc_negative(cx, cy, inner, a1, a0)
+                cr.close_path()
+                cr.set_source_rgba(1, 1, 1, 0.07)
+                cr.fill()
 
             # Brighter accent arc on the outer rim
             cr.new_path()
             cr.arc(cx, cy, outer - 1.5, a0 + 0.02, a1 - 0.02)
-            cr.set_source_rgba(r, g, b, 0.9)
-            cr.set_line_width(2.5)
+            cr.set_source_rgba(r, g, b, 1.0 if hot else 0.9)
+            cr.set_line_width(4.0 if hot else 2.5)
             cr.stroke()
 
         # Centre disc
@@ -401,6 +416,12 @@ class ButtonsPage(Gtk.ScrolledWindow):
         chip.add_css_class("ring-slice-chip")
         chip.add_css_class("flat")
         chip.connect("clicked", lambda _, idx=index: self._on_edit_slice(idx))
+
+        # Light up the matching ring wedge on hover (instead of a square chip bg)
+        motion = Gtk.EventControllerMotion()
+        motion.connect("enter", lambda *_a, idx=index: self._set_ring_hover(idx))
+        motion.connect("leave", lambda *_a: self._set_ring_hover(-1))
+        chip.add_controller(motion)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
         box.set_halign(Gtk.Align.CENTER)
@@ -427,6 +448,14 @@ class ButtonsPage(Gtk.ScrolledWindow):
 
         chip.set_child(box)
         return chip
+
+    def _set_ring_hover(self, index):
+        """Highlight (or clear) the hovered ring wedge."""
+        if getattr(self, "_ring_hover", -1) == index:
+            return
+        self._ring_hover = index
+        if getattr(self, "_ring_bg", None) is not None:
+            self._ring_bg.queue_draw()
 
     def _refresh_ring(self):
         """Rebuild the ring after slices change."""
