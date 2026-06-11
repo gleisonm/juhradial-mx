@@ -290,6 +290,26 @@ class MouseVisualization(Gtk.DrawingArea):
             label_y = y - box_height / 2
             line_start_x, line_start_y = x - 6, y
             line_end_x, line_end_y = label_x + box_width, y
+        elif line_from == 'right':
+            # Line comes from the right, label to the right of the point.
+            # Used for thumb-flank buttons on a 3/4 view where the empty space
+            # is on the right of the mouse.
+            line_length = 60
+            label_x = x + line_length
+            label_y = y - box_height / 2
+            line_start_x, line_start_y = x + 6, y
+            line_end_x, line_end_y = label_x, y
+        elif line_from == 'r_up':
+            # L-shaped line to the right then up, mirror of 'l_up'.
+            line_length = 60
+            label_x = x + line_length
+            if custom_label_y is not None:
+                label_y = img_y + custom_label_y * img_h - box_height / 2
+            else:
+                label_y = y - box_height / 2
+            line_start_x, line_start_y = x + 6, y
+            line_mid_x = label_x - 15  # horizontal end point
+            line_end_x, line_end_y = label_x, label_y + box_height / 2
         else:
             # Line comes from left, label to the left of point
             line_length = 60
@@ -340,7 +360,7 @@ class MouseVisualization(Gtk.DrawingArea):
         else:
             cr.set_source_rgba(0, 0.83, 1, 0.5)  # Subtle cyan line
         cr.set_line_width(2)
-        if line_from == 'l_up':
+        if line_from in ('l_up', 'r_up'):
             # L-shaped: horizontal then vertical up
             cr.move_to(line_start_x, line_start_y)
             cr.line_to(line_mid_x, line_start_y)  # horizontal segment
