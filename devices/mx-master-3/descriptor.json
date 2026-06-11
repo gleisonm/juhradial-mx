@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "id": "mx-master-3",
+  "name": "MX Master 3",
+  "status": "beta",
+  "productIds": ["0x4069", "0xb023"],
+  "features": {
+    "battery": true,
+    "dpi": true,
+    "smartshift": true,
+    "hiresscroll": true,
+    "thumbwheel": true,
+    "haptic": false,
+    "easyswitch": true,
+    "reprogControls": true,
+    "gestures": true
+  },
+  "dpi": { "min": 200, "max": 4000, "step": 50 },
+  "controls": [
+    { "cid": "0x0052", "name": "Middle click", "evdev": "0x112", "divertable": true },
+    { "cid": "0x0053", "name": "Back", "evdev": "0x113", "divertable": true },
+    { "cid": "0x0056", "name": "Forward", "evdev": "0x114", "divertable": true },
+    { "cid": "0x00c3", "name": "Gesture button", "divertable": true },
+    { "cid": "0x00c4", "name": "Shift wheel mode", "divertable": true }
+  ],
+  "hotspots": [
+    { "cid": "0x0053", "label": "Back", "xPct": 0.30, "yPct": 0.42, "side": "left" },
+    { "cid": "0x0056", "label": "Forward", "xPct": 0.34, "yPct": 0.30, "side": "left" },
+    { "cid": "0x00c3", "label": "Gesture button", "xPct": 0.26, "yPct": 0.60, "side": "left" },
+    { "kind": "scrollwheel", "label": "Scroll wheel", "xPct": 0.62, "yPct": 0.18, "side": "right" },
+    { "kind": "thumbwheel", "label": "Thumb wheel", "xPct": 0.40, "yPct": 0.52, "side": "left" }
+  ],
+  "easySwitchSlots": [
+    { "xPct": 0.55, "yPct": 0.72, "label": "1" },
+    { "xPct": 0.62, "yPct": 0.72, "label": "2" },
+    { "xPct": 0.69, "yPct": 0.72, "label": "3" }
+  ],
+  "image": "mx_master_4.png"
+}

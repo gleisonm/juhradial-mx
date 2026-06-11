@@ -455,6 +455,15 @@ fn test_reprog_controls_v4_is_allowed() {
 }
 
 #[test]
+fn test_thumbwheel_is_allowed() {
+    // ThumbWheel reporting is runtime-only (volatile), so it must be on the
+    // safelist and never treated as a blocklisted persistent feature.
+    assert_eq!(features::THUMBWHEEL, 0x2150);
+    assert!(allowed_features::is_allowed(features::THUMBWHEEL));
+    assert!(!blocklisted_features::is_blocklisted(features::THUMBWHEEL));
+}
+
+#[test]
 fn test_verify_feature_safety_onboard_profiles() {
     let result = verify_feature_safety(blocklisted_features::ONBOARD_PROFILES);
     assert!(result.is_err());

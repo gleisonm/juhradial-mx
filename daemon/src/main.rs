@@ -253,6 +253,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Clone haptic_manager for battery updater before passing to D-Bus
     let haptic_manager_for_battery = haptic_manager.clone();
+    // Clone for the per-app hardware profile switcher (Story 3.3)
+    let haptic_manager_for_switcher = haptic_manager.clone();
 
     // Determine device mode:
     // 1. Check config for user override (settings "Generic" toggle)
@@ -439,9 +441,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("Window tracking unavailable - using default profile only");
     }
 
-    // Store for later use in Story 3.3 (window-based profile switching)
+    // The WindowTracker (KWin/Wayland) is kept for a future Wayland focus path;
+    // the switcher below uses X11 focus detection. ProfileManager is reloaded
+    // inside the switcher task, so we don't need to hold these here.
     let _window_tracker = window_tracker;
     let _profile_manager = profile_manager;
+
+    // Spawn the per-app hardware profile switcher (Story 3.3): watches the
+    // focused window and applies that app's DPI/SmartShift overrides on top of
+    // the user's base settings.
+    {
+        let switcher_config = shared_config.clone();
+        tokio::spawn(async move {
+            juhradiald::profile_switcher::run_profile_switcher(
+                haptic_manager_for_switcher,
+                switcher_config,
+            )
+            .await
+        });
+    }
 
     // Start inotify watcher on /dev/input/ for instant device hotplug detection.
     // Shared across both evdev loops so they re-scan immediately on device changes.
@@ -670,7 +688,7 @@ async fn run_hidraw_loop(
     let mut handler = HidrawHandler::new(event_tx);
     let macro_cids_for_divert = macro_cids.clone();
     handler.set_macro_cids(macro_cids);
-    handler.set_shared_config(shared_config);
+    handler.set_shared_config(shared_config.clone());
 
     loop {
         if let Some(path) =
@@ -678,6 +696,25 @@ async fn run_hidraw_loop(
                 .await
         {
             preferred_path = Some(path);
+        }
+
+        // Apply the thumb-wheel mode and register its feature index so diverted
+        // rotation notifications can be re-mapped to zoom/volume. The divert is
+        // volatile (resets on disconnect/host switch), so this re-runs on every
+        // (re)connect alongside the button diverts above.
+        {
+            let (mode, invert) = match shared_config.read() {
+                Ok(cfg) => (cfg.thumbwheel.mode.clone(), cfg.thumbwheel.invert),
+                Err(_) => ("scroll".to_string(), false),
+            };
+            if let Ok(mut mgr) = haptic_manager.lock() {
+                if mgr.thumbwheel_supported() {
+                    if let Err(e) = mgr.set_thumbwheel_mode(&mode, invert) {
+                        tracing::debug!(error = %e, "Failed to apply thumb wheel mode");
+                    }
+                    handler.set_thumbwheel_feature_index(mgr.thumbwheel_feature_index());
+                }
+            }
         }
 
         // Try to open - use preferred path from HidppDevice if available
@@ -1060,6 +1097,17 @@ async fn process_gesture_events(
                 } else {
                     // Button released for non-radial action - no HideMenu needed
                     tracing::debug!(%action, "Button action released (no-op)");
+                }
+            }
+            GestureEvent::InjectShortcut { keys } => {
+                // Diverted thumb-wheel zoom/volume keystroke.
+                let act = juhradiald::actions::Action {
+                    action_type: juhradiald::actions::ActionType::Shortcut(keys.clone()),
+                    label: None,
+                    icon: None,
+                };
+                if let Err(e) = juhradiald::actions::ActionExecutor::execute(&act).await {
+                    warn!(keys = %keys, error = %e, "Thumb wheel shortcut injection failed");
                 }
             }
         }

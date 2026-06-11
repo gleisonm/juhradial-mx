@@ -56,6 +56,39 @@ impl ProfilesConfig {
     }
 }
 
+/// Per-application hardware overrides (Logitune-style).
+///
+/// Every field is optional: a `None` field means "don't override, use the
+/// base value". This lets a profile tweak only what it cares about (e.g. just
+/// DPI) while the rest falls back to the user's global settings.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct DeviceSettings {
+    /// Pointer DPI (e.g. 400..8000)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpi: Option<u16>,
+
+    /// SmartShift enabled (true) vs ratchet (false)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smartshift_enabled: Option<bool>,
+
+    /// SmartShift sensitivity as a UI percentage (1..100), matching the
+    /// Settings slider. Converted to the device threshold on apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smartshift_threshold: Option<u8>,
+    // NOTE: thumb wheel mode is intentionally global (not per-app). Its
+    // zoom/volume injection is driven by the global config, so a per-app
+    // divert without a matching injection source would silently do nothing.
+}
+
+impl DeviceSettings {
+    /// Whether this profile overrides any hardware setting at all.
+    pub fn is_empty(&self) -> bool {
+        self.dpi.is_none()
+            && self.smartshift_enabled.is_none()
+            && self.smartshift_threshold.is_none()
+    }
+}
+
 /// A radial menu profile (Story 3.1: Task 1.2)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {

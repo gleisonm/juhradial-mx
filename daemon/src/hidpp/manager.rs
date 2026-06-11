@@ -704,6 +704,50 @@ impl HapticManager {
     }
 
     // =========================================================================
+    // ThumbWheel Methods (delegated to HidppDevice)
+    // =========================================================================
+
+    /// Whether the thumb wheel (0x2150) is available
+    pub fn thumbwheel_supported(&mut self) -> bool {
+        if self.device.is_none() {
+            let _ = self.connect();
+        }
+        self.device
+            .as_ref()
+            .map(|d| d.thumbwheel_supported())
+            .unwrap_or(false)
+    }
+
+    /// ThumbWheel feature index (for the hidraw notification listener)
+    pub fn thumbwheel_feature_index(&mut self) -> Option<u8> {
+        if self.device.is_none() {
+            let _ = self.connect();
+        }
+        self.device.as_ref().and_then(|d| d.thumbwheel_feature_index())
+    }
+
+    /// Apply a thumb wheel mode.
+    ///
+    /// * `"scroll"` - native horizontal scroll (not diverted)
+    /// * `"zoom"` / `"volume"` - diverted to HID++ so the daemon re-maps
+    ///   rotation to zoom or volume keystrokes.
+    ///
+    /// `invert` reverses the rotation direction.
+    pub fn set_thumbwheel_mode(&mut self, mode: &str, invert: bool) -> Result<(), HapticError> {
+        if self.device.is_none() {
+            let _ = self.connect();
+        }
+        let divert = mode != "scroll";
+        match self.device.as_mut() {
+            Some(device) => device.set_thumbwheel_reporting(divert, invert),
+            None => {
+                tracing::warn!("Cannot set ThumbWheel mode: device not connected");
+                Err(HapticError::DeviceNotFound)
+            }
+        }
+    }
+
+    // =========================================================================
     // Battery Methods (delegated to HidppDevice)
     // =========================================================================
 

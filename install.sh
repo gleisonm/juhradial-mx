@@ -493,6 +493,13 @@ install_files() {
         sudo cp assets/devices/*.png assets/devices/*.svg /usr/share/juhradial/assets/devices/ 2>/dev/null || true
     fi
 
+    # Install JSON device descriptors (capability flags + hotspot layouts)
+    if [ -d devices ]; then
+        sudo mkdir -p /usr/share/juhradial/devices
+        sudo cp -r devices/* /usr/share/juhradial/devices/ 2>/dev/null || true
+        log_success "Device descriptors"
+    fi
+
     # Install AI assistant icons
     sudo cp assets/ai-*.svg /usr/share/juhradial/assets/ 2>/dev/null || true
 

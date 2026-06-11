@@ -10,7 +10,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use crate::evdev::GestureEvent;
@@ -30,6 +30,12 @@ pub const FEATURE_REPROG_CONTROLS_V4: u16 = 0x1B04;
 
 /// Diverted button notification function ID
 pub const DIVERTED_BUTTONS_EVENT: u8 = 0x00;
+
+/// Minimum gap between injected thumb-wheel keystrokes (zoom/volume).
+/// The thumb wheel reports at a high resolution, so without throttling a
+/// single nudge would fire dozens of keystrokes. 40ms caps it at ~25/sec,
+/// which feels responsive for volume/zoom without flooding.
+const THUMB_EMIT_DEBOUNCE: Duration = Duration::from_millis(40);
 
 /// Known button CIDs (Control IDs) for MX Master 4
 pub mod button_cid {
@@ -71,6 +77,11 @@ pub struct HidrawHandler {
     shared_config: Option<crate::config::SharedConfig>,
     /// The action that was triggered on button press (for release handling)
     active_button_action: Option<crate::config::ButtonAction>,
+    /// ThumbWheel feature index (0x2150), for recognising diverted thumb-wheel
+    /// rotation notifications. Discovered by the HID++ manager and injected here.
+    thumbwheel_feature_index: Option<u8>,
+    /// Timestamp of the last injected thumb-wheel keystroke (throttling).
+    last_thumb_emit: Option<Instant>,
 }
 
 /// Map HID++ CID to evdev key code for macro trigger forwarding
@@ -107,12 +118,20 @@ impl HidrawHandler {
             active_macro_cid: None,
             shared_config: None,
             active_button_action: None,
+            thumbwheel_feature_index: None,
+            last_thumb_emit: None,
         }
     }
 
     /// Register CIDs that are diverted for macro triggers (not gesture buttons)
     pub fn set_macro_cids(&mut self, cids: Vec<u16>) {
         self.macro_cids = cids;
+    }
+
+    /// Register the ThumbWheel feature index so diverted thumb-wheel rotation
+    /// notifications can be recognised and re-mapped to zoom/volume.
+    pub fn set_thumbwheel_feature_index(&mut self, index: Option<u8>) {
+        self.thumbwheel_feature_index = index;
     }
 
     /// Set the shared configuration for button action lookup
@@ -325,12 +344,87 @@ impl HidrawHandler {
             "HID++ report received"
         );
 
+        // Check for a diverted thumb-wheel rotation event FIRST. Thumb-wheel
+        // events share function_id 0 with diverted buttons, so they must be
+        // disambiguated by feature index before the button check below.
+        if let Some(tw_idx) = self.thumbwheel_feature_index {
+            // function_id 0 = the thumb-wheel rotation event. Guard against
+            // setReporting responses (function_id 2) that share the feature index.
+            if feature_index == tw_idx && function_id == 0 {
+                self.handle_thumbwheel_event(data).await;
+                return;
+            }
+        }
+
         // Check for diverted button event (feature 0x1B04, function 0x00)
         // The feature index varies per device, so we check function_id.
         // We also validate the CID in handle_button_event to ignore unknown buttons.
         if function_id == DIVERTED_BUTTONS_EVENT {
             self.handle_button_event(data).await;
         }
+    }
+
+    /// Read the current thumb-wheel mode and invert flag from shared config.
+    fn thumbwheel_mode_invert(&self) -> (String, bool) {
+        if let Some(ref config) = self.shared_config {
+            if let Ok(cfg) = config.read() {
+                return (cfg.thumbwheel.mode.clone(), cfg.thumbwheel.invert);
+            }
+        }
+        ("scroll".to_string(), false)
+    }
+
+    /// Handle a diverted thumb-wheel rotation notification (feature 0x2150).
+    ///
+    /// The notification carries a signed 16-bit rotation in bytes 4..6
+    /// (big-endian). Depending on the configured mode we re-map the direction
+    /// to zoom (Ctrl +/-) or volume keystrokes, throttled to avoid flooding.
+    async fn handle_thumbwheel_event(&mut self, data: &[u8]) {
+        if data.len() < 6 {
+            return;
+        }
+
+        let rotation = i16::from_be_bytes([data[4], data[5]]);
+        if rotation == 0 {
+            return;
+        }
+
+        let (mode, invert) = self.thumbwheel_mode_invert();
+        // In "scroll" mode the wheel isn't diverted, so we shouldn't receive
+        // these — but guard anyway so a stale divert can't inject keystrokes.
+        if mode == "scroll" {
+            return;
+        }
+
+        // Throttle: the wheel reports at high resolution.
+        let now = Instant::now();
+        if let Some(last) = self.last_thumb_emit {
+            if now.duration_since(last) < THUMB_EMIT_DEBOUNCE {
+                return;
+            }
+        }
+        self.last_thumb_emit = Some(now);
+
+        let mut up = rotation > 0;
+        if invert {
+            up = !up;
+        }
+
+        let keys = match (mode.as_str(), up) {
+            ("zoom", true) => "ctrl+equal",
+            ("zoom", false) => "ctrl+minus",
+            ("volume", true) => "XF86AudioRaiseVolume",
+            ("volume", false) => "XF86AudioLowerVolume",
+            _ => return,
+        };
+
+        tracing::debug!(rotation, mode = %mode, keys, "Thumb wheel -> shortcut");
+        let _ = self
+            .event_tx
+            .send(GestureEvent::InjectShortcut {
+                keys: keys.to_string(),
+            })
+            .await;
     }
 
     /// Handle a diverted button event

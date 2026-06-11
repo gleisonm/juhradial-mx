@@ -43,7 +43,7 @@ pub const GENERIC_TRIGGER_BUTTON: u16 = 0x113;
 const PRIMARY_BUTTONS: &[u16] = &[0x110, 0x111, 0x112];
 
 /// Event types for gesture button
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GestureEvent {
     /// Gesture button pressed, includes cursor position
     Pressed { x: i32, y: i32 },
@@ -58,6 +58,10 @@ pub enum GestureEvent {
         action: crate::config::ButtonAction,
         pressed: bool,
     },
+    /// Inject a keyboard shortcut (e.g. diverted thumb-wheel zoom/volume).
+    /// `keys` uses the same format as button shortcuts (e.g. "ctrl+equal",
+    /// "XF86AudioRaiseVolume").
+    InjectShortcut { keys: String },
 }
 
 /// Information about a detected input device

@@ -12,50 +12,53 @@ SPDX-License-Identifier: GPL-3.0
 # Coordinates are normalized (0-1) relative to the drawing area
 # line_from: 'top' = line comes from above, 'left' = line comes from left
 # =============================================================================
+# Positions are fractions of the mouse image rect, tuned for the 3/4 graphite
+# MX Master 4 photo (assets/devices/logitechmouse.png). Thumb-flank buttons use
+# line_from "right" so their labels land in the empty space right of the mouse.
 _BASE_MOUSE_BUTTONS = {
     "middle": {
         "name": "Middle Button",
         "action": "Middle Click",
-        "pos": (0.58, 0.19),  # Top of MagSpeed scroll wheel
-        "line_from": "top",
+        "pos": (0.235, 0.441),  # Diagonal wheel (left flank)
+        "line_from": "left",
     },
     "shift_wheel": {
         "name": "Shift Wheel Mode",
         "action": "SmartShift",
-        "pos": (0.58, 0.36),  # Square button below scroll wheel
+        "pos": (0.426, 0.199),  # Mode-shift button on top
         "line_from": "top",
-    },
-    "forward": {
-        "name": "Forward",
-        "action": "Forward",
-        "pos": (0.23, 0.40),  # Upper thumb button
-        "line_from": "left",
     },
     "horizontal_scroll": {
         "name": "Horizontal Scroll",
         "action": "Scroll Left/Right",
-        "pos": (0.24, 0.47),  # Grey thumb wheel
-        "line_from": "left",
+        "pos": (0.677, 0.281),  # Central wheel
+        "line_from": "right",
     },
     "back": {
         "name": "Back",
         "action": "Back",
-        "pos": (0.27, 0.54),  # Lower thumb button
-        "line_from": "left",
+        "pos": (0.746, 0.342),  # Back side button
+        "line_from": "right",
+    },
+    "forward": {
+        "name": "Forward",
+        "action": "Forward",
+        "pos": (0.672, 0.449),  # Forward side button
+        "line_from": "right",
     },
     "gesture": {
         "name": "Gestures",
         "action": "Virtual desktops",
-        "pos": (0.26, 0.36),  # Dot on upper thumb area
-        "line_from": "l_up",
-        "label_y": 0.34,  # Label Y position (above Forward)
+        "pos": (0.568, 0.591),  # Thumb rest / gesture area
+        "line_from": "r_up",
+        "label_y": 0.58,
     },
     "thumb": {
         "name": "Show Actions Ring",
         "action": "Radial Menu",
-        "pos": (0.28, 0.42),  # Dot on lower thumb area
-        "line_from": "l_up",
-        "label_y": 0.26,  # Label Y position (above Gestures)
+        "pos": (0.664, 0.663),  # Haptic Actions Ring panel (6-dot icon)
+        "line_from": "r_up",
+        "label_y": 0.74,
     },
 }
 
