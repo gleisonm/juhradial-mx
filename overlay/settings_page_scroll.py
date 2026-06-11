@@ -459,6 +459,23 @@ class ScrollPage(Gtk.ScrolledWindow):
         # ---- THUMB WHEEL ---- (Logitech only - MX Master has thumb wheel)
         self._thumb_card = SettingsCard(_("Thumb Wheel"))
 
+        # Mode: Scroll (native horizontal) / Zoom (Ctrl +/-) / Volume.
+        # Zoom and Volume divert the wheel to the daemon, which re-maps each
+        # rotation to keystrokes.
+        thumb_mode_row = SettingRow(
+            _("Mode"), _("What the thumb wheel controls")
+        )
+        self._thumb_mode_combo = Gtk.ComboBoxText()
+        self._thumb_mode_combo.append("scroll", _("Horizontal Scroll"))
+        self._thumb_mode_combo.append("zoom", _("Zoom"))
+        self._thumb_mode_combo.append("volume", _("Volume"))
+        self._thumb_mode_combo.set_active_id(
+            config.get("thumbwheel", "mode", default="scroll")
+        )
+        self._thumb_mode_combo.connect("changed", self._on_thumb_mode_changed)
+        thumb_mode_row.set_control(self._thumb_mode_combo)
+        self._thumb_card.append(thumb_mode_row)
+
         thumb_speed_row = SettingRow(
             _("Speed"), _("Horizontal scroll sensitivity")
         )
@@ -477,17 +494,14 @@ class ScrollPage(Gtk.ScrolledWindow):
         self._thumb_card.append(thumb_speed_row)
 
         thumb_invert_row = SettingRow(
-            _("Invert Direction"), _("Reverse thumb wheel scroll direction")
+            _("Invert Direction"), _("Reverse thumb wheel direction")
         )
-        thumb_invert = Gtk.Switch()
-        thumb_invert.set_active(
+        self._thumb_invert = Gtk.Switch()
+        self._thumb_invert.set_active(
             config.get("thumbwheel", "invert", default=False)
         )
-        thumb_invert.connect(
-            "state-set",
-            lambda s, state: config.set("thumbwheel", "invert", state) or False,
-        )
-        thumb_invert_row.set_control(thumb_invert)
+        self._thumb_invert.connect("state-set", self._on_thumb_invert_changed)
+        thumb_invert_row.set_control(self._thumb_invert)
         self._thumb_card.append(thumb_invert_row)
 
         content.append(self._thumb_card)
@@ -735,6 +749,42 @@ None,      Down, Button5, {lines}
         except Exception:
             return None
 
+    # ------------------------------------------------------------------
+    # Thumb wheel
+    # ------------------------------------------------------------------
+    def _on_thumb_mode_changed(self, combo):
+        mode = combo.get_active_id() or "scroll"
+        config.set("thumbwheel", "mode", mode, auto_save=True)
+        if not self._is_generic:
+            self._apply_thumbwheel_to_device()
+
+    def _on_thumb_invert_changed(self, switch, state):
+        config.set("thumbwheel", "invert", state, auto_save=True)
+        if not self._is_generic:
+            # config.set hasn't returned yet; apply with the new state directly.
+            self._apply_thumbwheel_to_device(invert_override=state)
+        return False
+
+    def _apply_thumbwheel_to_device(self, invert_override=None):
+        """Apply the thumb wheel mode + invert to the device via D-Bus."""
+        proxy = self._get_dbus_proxy()
+        if not proxy:
+            return
+        mode = config.get("thumbwheel", "mode", default="scroll")
+        invert = (
+            invert_override
+            if invert_override is not None
+            else config.get("thumbwheel", "invert", default=False)
+        )
+        try:
+            proxy.call_sync(
+                "SetThumbWheelMode",
+                GLib.Variant("(sb)", (mode, bool(invert))),
+                Gio.DBusCallFlags.NONE, 2000, None,
+            )
+        except GLib.Error as e:
+            logger.error("D-Bus error setting thumb wheel mode: %s", e.message)
+
     def _apply_dpi_to_device(self, dpi):
         proxy = self._get_dbus_proxy()
         if not proxy:
@@ -889,3 +939,18 @@ None,      Down, Button5, {lines}
                 config.set("scroll", "smooth", hires)
         except GLib.Error as e:
             logger.error("D-Bus error loading HiResScroll: %s", e.message)
+
+        # Thumb wheel: hide the card if the device has no thumb wheel,
+        # otherwise re-assert the saved mode so a non-scroll mode keeps its
+        # (volatile) divert active after the daemon restarts.
+        try:
+            supported = proxy.call_sync(
+                "ThumbWheelSupported", None,
+                Gio.DBusCallFlags.NONE, 2000, None,
+            )
+            if supported and supported.get_child_value(0).get_boolean():
+                self._apply_thumbwheel_to_device()
+            else:
+                self._thumb_card.set_visible(False)
+        except GLib.Error as e:
+            logger.error("D-Bus error loading ThumbWheel: %s", e.message)

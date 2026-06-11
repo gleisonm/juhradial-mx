@@ -350,6 +350,44 @@ impl JuhRadialService {
     }
 
     // =========================================================================
+    // THUMBWHEEL METHODS
+    // =========================================================================
+
+    /// Whether the connected device exposes the thumb wheel (0x2150).
+    async fn thumb_wheel_supported(&self) -> fdo::Result<bool> {
+        match self.haptic_manager.lock() {
+            Ok(mut manager) => Ok(manager.thumbwheel_supported()),
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to lock haptic manager for thumb_wheel_supported");
+                Ok(false)
+            }
+        }
+    }
+
+    /// Apply a thumb wheel mode: "scroll" (native), "zoom", or "volume".
+    ///
+    /// The hidraw listener re-reads the mode from config for re-mapping, but we
+    /// apply the divert/invert here so the change takes effect immediately
+    /// without waiting for a reconnect.
+    async fn set_thumb_wheel_mode(&self, mode: String, invert: bool) -> fdo::Result<()> {
+        tracing::info!(mode = %mode, invert, "SetThumbWheelMode called");
+
+        match self.haptic_manager.lock() {
+            Ok(mut manager) => match manager.set_thumbwheel_mode(&mode, invert) {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    tracing::error!(error = %e, mode = %mode, "Failed to set thumb wheel mode");
+                    Err(fdo::Error::Failed(format!("Failed to set thumb wheel mode: {}", e)))
+                }
+            },
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to lock haptic manager for set_thumb_wheel_mode");
+                Err(fdo::Error::Failed(format!("Lock error: {}", e)))
+            }
+        }
+    }
+
+    // =========================================================================
     // EASY-SWITCH METHODS
     // =========================================================================
 

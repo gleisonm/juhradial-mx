@@ -272,6 +272,32 @@ impl Default for ButtonsConfig {
     }
 }
 
+/// Thumb wheel settings.
+/// Matches the "thumbwheel" section in config.json written by the Settings UI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThumbWheelConfig {
+    /// Mode: "scroll" (native horizontal scroll), "zoom", or "volume".
+    #[serde(default = "default_thumbwheel_mode")]
+    pub mode: String,
+
+    /// Reverse the thumb wheel rotation direction.
+    #[serde(default)]
+    pub invert: bool,
+}
+
+fn default_thumbwheel_mode() -> String {
+    "scroll".to_string()
+}
+
+impl Default for ThumbWheelConfig {
+    fn default() -> Self {
+        Self {
+            mode: default_thumbwheel_mode(),
+            invert: false,
+        }
+    }
+}
+
 // ============================================================================
 // Main Configuration
 // ============================================================================
@@ -295,6 +321,10 @@ pub struct Config {
     #[serde(default)]
     pub buttons: ButtonsConfig,
 
+    /// Thumb wheel mode/invert
+    #[serde(default)]
+    pub thumbwheel: ThumbWheelConfig,
+
     /// Configuration file path (not serialized)
     #[serde(skip)]
     pub config_path: Option<PathBuf>,
@@ -311,6 +341,7 @@ impl Default for Config {
             theme: default_theme(),
             blur_enabled: true,
             buttons: ButtonsConfig::default(),
+            thumbwheel: ThumbWheelConfig::default(),
             config_path: None,
         }
     }
@@ -569,6 +600,20 @@ mod tests {
         assert!(config.haptics.enabled);
         assert_eq!(config.haptics.default_pattern, "subtle_collision");
         assert_eq!(config.theme, "catppuccin-mocha");
+    }
+
+    #[test]
+    fn test_thumbwheel_defaults_and_parsing() {
+        // Absent section -> default "scroll" / not inverted
+        let config: Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(config.thumbwheel.mode, "scroll");
+        assert!(!config.thumbwheel.invert);
+
+        // Explicit section parses; unknown keys (e.g. "speed") are ignored
+        let json = r#"{"thumbwheel": {"mode": "zoom", "invert": true, "speed": 5}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.thumbwheel.mode, "zoom");
+        assert!(config.thumbwheel.invert);
     }
 
     #[test]

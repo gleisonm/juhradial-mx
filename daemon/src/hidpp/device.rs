@@ -56,6 +56,10 @@ pub struct HidppDevice {
     reprog_controls_supported: bool,
     /// REPROG_CONTROLS_V4 feature index (0x1B04) - for button divert
     reprog_controls_feature_index: Option<u8>,
+    /// Whether ThumbWheel feature is available (0x2150)
+    thumbwheel_supported: bool,
+    /// ThumbWheel feature index (0x2150) - for thumb wheel divert/invert
+    thumbwheel_feature_index: Option<u8>,
     /// Path to the hidraw device we connected to
     device_path: PathBuf,
 }
@@ -229,6 +233,8 @@ impl HidppDevice {
                     is_unified_battery: false,
                     reprog_controls_supported: false,
                     reprog_controls_feature_index: None,
+                    thumbwheel_supported: false,
+                    thumbwheel_feature_index: None,
                     device_path: device_path.clone(),
                 };
 
@@ -729,6 +735,16 @@ impl HidppDevice {
                     tracing::info!(
                         index = feature_index,
                         "REPROG_CONTROLS_V4 feature found (0x1B04) - button divert available"
+                    );
+                }
+
+                // Check for ThumbWheel feature (0x2150) - horizontal thumb wheel
+                if feature_id == features::THUMBWHEEL {
+                    self.thumbwheel_supported = true;
+                    self.thumbwheel_feature_index = Some(feature_index);
+                    tracing::info!(
+                        index = feature_index,
+                        "ThumbWheel feature found (0x2150) - thumb wheel modes available"
                     );
                 }
             }
@@ -1472,6 +1488,72 @@ impl HidppDevice {
                 tracing::warn!("Failed to set HiResScroll mode");
                 Err(HapticError::IoError(std::io::Error::other(
                     "Failed to set HiResScroll",
+                )))
+            }
+        }
+    }
+
+    // =========================================================================
+    // ThumbWheel Methods (0x2150)
+    // =========================================================================
+
+    /// Whether the thumb wheel (0x2150) is available on this device
+    pub fn thumbwheel_supported(&self) -> bool {
+        self.thumbwheel_supported
+    }
+
+    /// ThumbWheel feature index, needed by the hidraw listener to recognise
+    /// diverted thumb-wheel rotation notifications.
+    pub fn thumbwheel_feature_index(&self) -> Option<u8> {
+        self.thumbwheel_feature_index
+    }
+
+    /// Set thumb wheel reporting and invert direction.
+    ///
+    /// * `divert` - when `true`, thumb-wheel rotation is sent as HID++
+    ///   notifications instead of native horizontal scroll (used for the
+    ///   zoom/volume modes). When `false`, the wheel does native horizontal
+    ///   scroll.
+    /// * `invert` - reverse the rotation direction.
+    ///
+    /// Function [2] setThumbwheelReporting(reporting, invertDirection).
+    /// RUNTIME-ONLY: the setting is volatile and resets on disconnect.
+    pub fn set_thumbwheel_reporting(
+        &mut self,
+        divert: bool,
+        invert: bool,
+    ) -> Result<(), HapticError> {
+        let feature_index = match self.thumbwheel_feature_index {
+            Some(idx) => idx,
+            None => {
+                tracing::debug!("ThumbWheel not supported on this device");
+                return Err(HapticError::NotSupported);
+            }
+        };
+
+        tracing::info!(
+            feature_index,
+            divert,
+            invert,
+            "Setting ThumbWheel reporting"
+        );
+
+        // Function [2] setThumbwheelReporting(reporting, invertDirection)
+        let params = [
+            if divert { 0x01 } else { 0x00 },
+            if invert { 0x01 } else { 0x00 },
+            0x00,
+        ];
+
+        match self.hidpp_request(feature_index, 0x02, &params) {
+            Some(_) => {
+                tracing::debug!(divert, invert, "ThumbWheel reporting set successfully");
+                Ok(())
+            }
+            None => {
+                tracing::warn!("Failed to set ThumbWheel reporting");
+                Err(HapticError::IoError(std::io::Error::other(
+                    "Failed to set ThumbWheel reporting",
                 )))
             }
         }

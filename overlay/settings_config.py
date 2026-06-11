@@ -60,6 +60,11 @@ class ConfigManager:
             "smartshift_threshold": 50,
             "mode": "smartshift",
         },
+        "thumbwheel": {
+            "mode": "scroll",
+            "speed": 5,
+            "invert": False,
+        },
         "app": {"start_at_login": True, "show_tray_icon": True},
         "device_mode": "auto",
         "radial": {

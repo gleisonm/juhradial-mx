@@ -63,6 +63,17 @@ pub mod features {
     /// Functions: [0] getRatchetControlMode, [1] setRatchetControlMode
     pub const SMARTSHIFT_LEGACY: u16 = 0x2110;
 
+    /// ThumbWheel - Horizontal thumb wheel reporting/invert control (0x2150)
+    ///
+    /// Used to switch the thumb wheel between native horizontal scroll and a
+    /// "diverted" mode where rotation arrives as HID++ notifications, letting us
+    /// re-map it to zoom or volume. RUNTIME-ONLY: setReporting is volatile and
+    /// resets on disconnect, so it must be re-applied on reconnect.
+    ///
+    /// Functions: [0] getThumbwheelInfo, [1] getThumbwheelStatus,
+    ///            [2] setThumbwheelReporting(reporting, invertDirection)
+    pub const THUMBWHEEL: u16 = 0x2150;
+
     /// Change Host - Easy-Switch device slot switching (READ-ONLY safe)
     /// Functions: [0] getHostInfo (returns numHosts, currentHost), [1] setHost(slot)
     /// Used for reading current Easy-Switch status - we only use function 0
@@ -153,6 +164,7 @@ pub mod allowed_features {
         features::MX4_HAPTIC_ALT,
         features::ADJUSTABLE_DPI,
         features::REPROG_CONTROLS_V4,
+        features::THUMBWHEEL,
     ];
 
     /// Check if a feature ID is explicitly allowed
